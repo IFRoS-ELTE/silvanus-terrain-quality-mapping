@@ -1,0 +1,44 @@
+# Tiny run to check that the whole pipeline works on a laptop CPU.
+# It will not produce a useful model. It finishes in a few minutes and
+# proves that data loading, training, checkpointing, evaluation and
+# ONNX export all fit together before we spend GPU hours.
+
+experiment: smoke_cpu
+seed: 42
+device: cpu
+output_dir: runs
+
+data:
+  processed_root: data/processed
+  train_sources: [deepcrack]
+  eval_sources: [deepcrack]
+  crop_size: 128
+  crack_bias: 0.5
+  photometric: 0.25
+  num_workers: 0        # worker processes are slow to start on Windows
+
+model:
+  name: unet
+  base_channels: 8
+  depth: 4
+  dropout: 0.0
+
+loss:
+  bce_weight: 0.5
+  dice_weight: 0.5
+  pos_weight: 5.0
+
+train:
+  epochs: 2
+  batch_size: 4
+  lr: 0.001
+  weight_decay: 0.0001
+  amp: false
+  grad_clip: 1.0
+  early_stop_patience: 10
+  max_train_batches: 20
+  max_val_batches: 10
+
+eval:
+  thresholds: [0.3, 0.5, 0.7]
+  tolerance_px: 2

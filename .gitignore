@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Datasets and training outputs are large and can be regenerated with
+# the scripts, so they never go into git. Share trained models through
+# the shared drive or a GitHub release instead.
+vision_training/data/
+vision_training/runs/
+*.pt
+*.pth
+*.onnx
+*.zip
+
+# ROS 2 build folders (for the packages that come later)
+build/
+install/
+log/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

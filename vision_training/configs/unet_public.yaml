@@ -1,0 +1,48 @@
+# Baseline: small U-Net trained from scratch on the public crack datasets.
+# Meant for the GPU server. On a laptop CPU use smoke_cpu.yaml instead.
+#
+# All relative paths are relative to the vision_training/ folder.
+# Any value can be overridden from the command line, for example
+#   python scripts/train.py --config configs/unet_public.yaml train.epochs=50
+
+experiment: unet16_public
+seed: 42
+device: auto            # auto picks cuda, then mps, then cpu
+output_dir: runs
+
+data:
+  processed_root: data/processed
+  # null means every dataset listed in index.csv. Crack500 is included
+  # automatically once it has been downloaded and prepared.
+  train_sources: null
+  eval_sources: null
+  crop_size: 256
+  crack_bias: 0.5       # share of crops centred on a crack pixel
+  photometric: 0.25     # strength of brightness/contrast jitter, 0 turns it off
+  num_workers: 4
+
+model:
+  name: unet
+  base_channels: 16     # 16 is about 1.9M parameters, fine for CPU inference on the robot
+  depth: 4
+  dropout: 0.1
+
+loss:
+  bce_weight: 0.5
+  dice_weight: 0.5
+  pos_weight: 5.0       # extra weight on crack pixels in the BCE term
+
+train:
+  epochs: 150
+  batch_size: 16
+  lr: 0.001
+  weight_decay: 0.0001
+  amp: true             # mixed precision, only used on CUDA
+  grad_clip: 1.0
+  early_stop_patience: 30   # epochs without a better val Dice before we stop
+  max_train_batches: null   # set a number for quick debugging runs
+  max_val_batches: null
+
+eval:
+  thresholds: [0.3, 0.4, 0.5, 0.6, 0.7]
+  tolerance_px: 2
