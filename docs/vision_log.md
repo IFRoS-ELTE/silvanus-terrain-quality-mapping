@@ -97,10 +97,33 @@ Low recall and high precision are expected this early: the model finds the obvio
 - The screenshots come from the threshold-based crack node on branch `aritra-crack-detection` (ROS 2 Jazzy, subscribes to `/camera/color/image_raw`, publishes JSON boxes on `/crack_detection/detections` and a debug image on `/crack_detection/debug_image`). Several boxes fall on the robot's own bumper and wheels, which confirms that the camera needs a fixed body mask.
 - The first commit was amended once to remove an unwanted co-author line; `main` was force-pushed a single time and the `aritra-crack-detection` branch was rebased onto it. Nothing else rewrites history. Normal workflow from now on: one branch per piece of work, `git pull` (with `pull.rebase true`) before pushing, merge into `main` through a pull request, never force-push.
 
+### 2026-09-30: first full training run (baseline)
+
+Setup: GPU server (`/scratch2/yamin/silvanus-terrain-quality-mapping`), own venv inside `vision_training/.venv` with CUDA PyTorch. Config `configs/unet_public.yaml` unchanged: U-Net with base_channels 16 (1.94M parameters), DeepCrack + CrackForest, 256 px crops, batch 16, AdamW lr 1e-3 with cosine schedule, 150 epochs. 2 to 3 s per epoch, about 7 minutes for the whole run.
+
+Run folder on the server: `vision_training/runs/unet16_public_20260930_102903/` (best.pt, eval_test/). Not in git.
+
+Training: best validation Dice 0.797 at epoch 146, threshold 0.7. Early stopping never triggered; the cosine schedule brought the learning rate to zero and the curve flattened by itself. Final train loss about 0.15, val loss about 0.177, so no real overfitting.
+
+Test set, 255 images, threshold 0.7 (chosen on validation):
+
+| Subset | Images | Dice | IoU | Precision | Recall | Tolerant F1 (2 px) |
+|---|---|---|---|---|---|---|
+| All | 255 | 0.833 | 0.713 | 0.893 | 0.780 | 0.909 (P 0.958, R 0.865) |
+| DeepCrack | 237 | 0.836 | 0.718 | | | 0.908 |
+| CrackForest | 18 | 0.718 | 0.560 | | | 0.934 |
+
+What the numbers say:
+- The chosen threshold was the top of the sweep (0.3 to 0.7), so the real optimum may be higher. The sweep in `unet_public.yaml` now goes to 0.9. The BCE pos_weight pushes probabilities up, which explains a best cut above 0.5.
+- CrackForest: strict Dice 0.72 but tolerant F1 0.93. Its cracks are 1 to 2 px wide, so small border disagreements with the annotator cost a lot of strict Dice. The model finds the cracks; it does not match the hand-drawn border to the pixel. This is the reason we report both metric families.
+- Test Dice (0.83) is higher than validation Dice (0.80). Validation has only 46 images, so its numbers are noisy. Report test numbers, use validation only for choosing the checkpoint and threshold.
+- Recall (0.78) is lower than precision (0.89): the model misses more than it hallucinates. For the robot that is the safer side (fewer false alarms on tile joints), but check the worst overlays in `eval_test/overlays/` for the kind of cracks that are missed.
+- Not directly comparable with published DeepCrack numbers: papers usually report ODS/OIS F-scores on thinned predictions with their own tolerance. Ours is a pixel metric with a 2 px dilation.
+
 ## 4. Next steps
 
 Vision training:
-1. Real training run on the GPU server with `configs/unet_public.yaml` (DeepCrack + CrackForest, base_channels 16, 150 epochs with early stopping). Then evaluate and export. Record numbers here.
+1. ~~Real training run on the GPU server~~ Done, see the baseline entry above. Still to do: rerun with the wider threshold sweep, look at the worst overlays, export ONNX and time it on CPU.
 2. Download Crack500 by hand, check the layout, rerun `prepare_data.py`, retrain. Crack500 is phone photos of pavement, the closest public match to the robot view.
 3. Compare base_channels 16 vs 32 (accuracy vs CPU fps on the robot).
 4. Run `predict.py` on spare D435 frames of campus pavement and corridor floors. Collect false positives (tile joints, painted lines, shadows, drains) as hard negatives.
@@ -109,7 +132,7 @@ Vision training:
 
 Rest of the vision work (not started):
 7. Spare D435 experiments (handover section 9.4): height 0.4 to 0.9 m, tilt 30 to 60 degrees, walking 0.3 / 0.6 / 1.0 m/s, depth 848x480 at 30 fps, colour 1280x720, align on, fixed exposure. Output: plane fit noise vs distance and speed, recommended arm pose for the robot side of the team.
-8. `terrain_vision` ROS 2 package: depth hazard node (RANSAC plane, residual clusters, sizes, unevenness), crack node using the exported ONNX and its JSON, mock publisher for `/ground/*` topics so C and A can test their subscribers.
+8. `terrain_vision` ROS 2 package: depth hazard node (RANSAC plane, residual clusters, sizes, unevenness), crack node using the exported ONNX and its JSON, mock publisher for `/ground/*` topics so the IMU/fusion and robot-control sides can test their subscribers.
 
 ## 5. Open questions
 
