@@ -44,5 +44,8 @@ train:
   max_val_batches: null
 
 eval:
-  thresholds: [0.3, 0.4, 0.5, 0.6, 0.7]
+  # The first full run picked 0.7, the top of the old range, so the
+  # sweep goes higher now. pos_weight in the loss pushes probabilities
+  # up, which is why the best cut sits above 0.5.
+  thresholds: [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
   tolerance_px: 2
