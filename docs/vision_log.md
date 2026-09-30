@@ -1,15 +1,15 @@
-# Vision work log (Person B)
+# Vision work log
 
 Running log of the vision part: what was built, why, what was measured, and what comes next. It is written so the work can be picked up again from this file alone, without any chat history. Newest entries go at the bottom of section 3.
 
-Project context is in `PROJECT_HANDOVER.md` (shared by the team, not in this repo). The parts that matter for vision: sections 4.1 (sensing layers), 4.8 (cracks), 8 (interface contracts), 9.2 and 9.4 (data collection), 10 (evaluation plan), 12 (Person B tasks).
+Project context is in `PROJECT_HANDOVER.md` (shared by the team, not in this repo). The parts that matter for vision: sections 4.1 (sensing layers), 4.8 (cracks), 8 (interface contracts), 9.2 and 9.4 (data collection), 10 (evaluation plan), 12 (work split).
 
-## 1. What Person B owns
+## 1. Scope of the vision work
 
 - Depth hazard node: depth image to point cloud, RANSAC ground plane, residuals, holes and bumps with size, unevenness score. Publishes `/ground/hazards`, `/ground/hazard_markers`, `/ground/unevenness`.
 - Crack node: colour image to crack mask (ONNX model), crack pixels to 3D through the aligned depth, onto the map.
 - RGB terrain classifier on image patches (grass, asphalt, gravel, tiles). Publishes `/ground/rgb_terrain`.
-- Spare D435 home experiments: best height, tilt, camera modes, walking speed. Output: recommended arm pose for Person A.
+- Spare D435 home experiments: best height, tilt, camera modes, walking speed. Output: recommended arm pose for the robot side of the team.
 
 Topic and JSON formats are fixed in handover section 8. Hazard JSON on `/ground/hazards`: `{id, type: "hole"|"bump"|"crack", x, y, z, frame, length, width, depth, confidence, stamp}`.
 
@@ -91,6 +91,12 @@ ONNX Runtime CPU, laptop, 640x480, base_channels 8: 88 ms per frame (11 fps)
 
 Low recall and high precision are expected this early: the model finds the obvious wide cracks and misses thin ones. The worst overlays are thin hairline cracks and a few `IMG*` photos that look different from the rest.
 
+### 2026-09-30 (later): README, simulation screenshots, git history
+
+- README rewritten: project summary, Gazebo and RViz screenshots from the simulation (`docs/images/`), and a short "where things stand" section instead of the old per-folder table.
+- The screenshots come from the threshold-based crack node on branch `aritra-crack-detection` (ROS 2 Jazzy, subscribes to `/camera/color/image_raw`, publishes JSON boxes on `/crack_detection/detections` and a debug image on `/crack_detection/debug_image`). Several boxes fall on the robot's own bumper and wheels, which confirms that the camera needs a fixed body mask.
+- The first commit was amended once to remove an unwanted co-author line; `main` was force-pushed a single time and the `aritra-crack-detection` branch was rebased onto it. Nothing else rewrites history. Normal workflow from now on: one branch per piece of work, `git pull` (with `pull.rebase true`) before pushing, merge into `main` through a pull request, never force-push.
+
 ## 4. Next steps
 
 Vision training:
@@ -99,10 +105,10 @@ Vision training:
 3. Compare base_channels 16 vs 32 (accuracy vs CPU fps on the robot).
 4. Run `predict.py` on spare D435 frames of campus pavement and corridor floors. Collect false positives (tile joints, painted lines, shadows, drains) as hard negatives.
 5. Annotate about 120 crack frames and 150 negatives from our own data (CVAT or Label Studio, class `crack`), add an `own` converter grouped by session, fine tune.
-6. RGB terrain classifier on patches (grass, asphalt, gravel, tiles). Same package structure; will need patch labels from the terrain segments Person C labels in the bags.
+6. RGB terrain classifier on patches (grass, asphalt, gravel, tiles). Same package structure; will need patch labels from the terrain segments labelled in the bags on the IMU side.
 
 Rest of the vision work (not started):
-7. Spare D435 experiments (handover section 9.4): height 0.4 to 0.9 m, tilt 30 to 60 degrees, walking 0.3 / 0.6 / 1.0 m/s, depth 848x480 at 30 fps, colour 1280x720, align on, fixed exposure. Output: plane fit noise vs distance and speed, recommended arm pose for Person A.
+7. Spare D435 experiments (handover section 9.4): height 0.4 to 0.9 m, tilt 30 to 60 degrees, walking 0.3 / 0.6 / 1.0 m/s, depth 848x480 at 30 fps, colour 1280x720, align on, fixed exposure. Output: plane fit noise vs distance and speed, recommended arm pose for the robot side of the team.
 8. `terrain_vision` ROS 2 package: depth hazard node (RANSAC plane, residual clusters, sizes, unevenness), crack node using the exported ONNX and its JSON, mock publisher for `/ground/*` topics so C and A can test their subscribers.
 
 ## 5. Open questions
