@@ -14,7 +14,7 @@ The robot covers an area on its own in a zigzag sweep. While it drives, the
 camera measures the ground ahead and the IMU measures what the wheels actually
 felt. Everything lands on a map. The robot slows down before hazards.
 
-The one-line story: **the camera predicts, the IMU confirms.**
+
 
 ---
 
@@ -87,17 +87,36 @@ Three things on top of the 2D map from SLAM:
 - Depth pipeline running as a ROS 2 node, publishing `/ground/hazards`,
   `/ground/hazard_markers`, `/ground/unevenness`
 - `xsens_link` to `base_link` transform measured and published
+- **First outdoor bag**, with a written surface log: one pass over each surface
+  we can reach, times and surface types noted as we drive
 - Crack model running on real frames from our own bags, not simulation
 - Robot body and gripper mask
 - Topic names and record schema agreed, written down, not changed after
 
-**Gate:** everyone working on real data from our own robot.
+**Gate:** everyone working on real data from our own robot, and we know what
+outdoors actually looks like.
+
+The first outdoor bag is deliberately early. It does not need to be good: its
+job is to surface the problems while there is still time to solve them. Expect
+at least these, and write down what we find:
+
+- bright sunlight washes out the D435's depth
+- GNSS needs several minutes outdoors to get a fix
+- 2D lidar has little to match against in an open garden, so SLAM may not hold
+- grass makes skid-steer wheel odometry slip
+
+The full labelled dataset comes in week 4. This is the reconnaissance run.
+
+**Depends on the robot battery**, which went flat and is on charge.
 
 ### Week 2 — 8 to 14 October. Localization and IMU.
 
 - Indoor map built with SLAM Toolbox and saved; AMCL localizing on it
 - IMU roughness node: gravity removal, 1 s windows, RMS, peak, FFT bands
 - Nav2 configured for the Scout: footprint, inflation, controller
+- **Outdoor localization tested** on the week 1 bag: does SLAM hold, is the GNSS
+  fix good enough, how far does wheel odometry drift on grass. Pick one and
+  write down why.
 - RGB terrain classifier, first version
 - Annotation under way on frames from our own bags
 
