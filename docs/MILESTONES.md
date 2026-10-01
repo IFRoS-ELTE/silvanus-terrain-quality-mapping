@@ -1,150 +1,171 @@
-# Project plan to the end of November
+# Project plan, October to end of November
 
 Terrain quality and hazard mapping with Silvanus. IFRoS Robotics Lab, ELTE.
 
 **Draft for discussion.** Agree it as a team, then it becomes the plan.
 
-Eight weeks, from 6 October to 30 November.
+Eight weeks from 1 October. Final delivery is a **presentation**, end of November.
 
 ---
 
-## What "finished" means
+## What finished looks like
 
-A demo and a report showing:
-
-1. The robot covers an area on its own, in a zigzag sweep.
-2. While it drives, the camera measures the ground ahead: holes, bumps,
-   unevenness, surface type.
-3. The IMU measures what the wheels actually felt.
-4. Everything lands on a map: the path coloured by roughness, hazard markers
-   with measured sizes, terrain type per area.
-5. The robot slows down before hazards.
-6. A report that comes out of the data automatically.
+The robot covers an area on its own in a zigzag sweep. While it drives, the
+camera measures the ground ahead and the IMU measures what the wheels actually
+felt. Everything lands on a map. The robot slows down before hazards.
 
 The one-line story: **the camera predicts, the IMU confirms.**
 
 ---
 
-## Who does what
+## How a hazard is classified
 
-Agreed by the three of us. Fill in names where they are open.
+Every hazard ends up in one of three classes, and this is the headline result.
 
-| Area | Owner |
-|---|---|
-| Robot operation, bring-up, recording sessions | Praveen |
-| Depth geometry: ground plane, holes and bumps | Praveen |
-| IMU: transform, time sync, roughness, vibration-based terrain class | Praveen |
-| Localization, Nav2, coverage path planning, speed governor | Praveen |
-| Crack segmentation: dataset, training, deployment | Aritra |
-| RGB terrain classification from image patches | open |
-| Frame annotation from our own bags | open |
-| Fusion node, record schema, the map layer | open |
-| Dashboard, report generator, evaluation plots | open |
+| Class | Camera saw it | IMU felt it | Meaning | Colour on the map |
+|---|---|---|---|---|
+| **A** | yes | no | Seen but not confirmed. Either the wheels missed it, or it is too small for this robot to feel. | **yellow** |
+| **B** | no | yes | Felt but not seen. The camera missed it: too small, masked, or blurred. | **blue** |
+| **C** | yes | yes | **Confirmed.** Both agree. | **red** |
 
-The four open items matter. The ones most likely to be left too late are the
-**IMU signal side** and the **report generator**, because neither is urgent
-until suddenly it is.
+Class C is what the project is for. Classes A and B are where it is interesting:
+A tells us the smallest hazard this robot actually feels, B tells us what the
+camera misses. Both are results, not failures.
+
+---
+
+## How it is shown
+
+Three levels, for three different purposes.
+
+### Level 1 — live, while driving
+
+**Point cloud coloured by height above the ground plane.** Every depth point
+already has a signed distance to the fitted plane; that becomes a colour:
+
+```
+below the plane  ->  BLUE    hole
+on the plane     ->  GREY    flat ground
+above the plane  ->  RED     bump
+```
+
+Full scale at plus or minus 40 mm. A book glows red, a pothole glows blue, flat
+floor stays grey. Diverging colours, because the data has a meaningful zero:
+the ground plane itself.
+
+Hazard markers alongside it: a box per hazard, sized to the measured length,
+width and height, labelled `bump 54 mm`.
+
+### Level 2 — the map layer
+
+Three things on top of the 2D map from SLAM:
+
+- **Driven path coloured by roughness.** One hue going light to dark, not a
+  rainbow. Roughness is an amount, and rainbows make amounts look like
+  categories.
+- **Terrain class per 0.5 m cell.** Distinct colours per surface: tile,
+  concrete, asphalt, grass, gravel, dirt. Fixed colour per surface so adding one
+  never repaints the others.
+- **Hazard markers, numbered**, coloured A yellow, B blue, C red as above, so
+  they match the table in the presentation.
+
+### Level 3 — the presentation
+
+- The map figure: path coloured by roughness, numbered hazard pins
+- The hazard table, one row per hazard, with an image crop
+- Roughness per surface, box plots
+- **Camera-predicted unevenness against IMU-measured roughness**, one point per
+  0.25 m of path. If that correlates, the project's central claim is proven in a
+  single figure.
 
 ---
 
 ## Week by week
 
-### Week 1 — 6 to 12 October. Everything on real data.
+### Week 1 — 1 to 7 October. Everything on real data.
 
-| Who | Deliverable |
-|---|---|
-| Praveen | Depth pipeline running as a ROS 2 node, publishing `/ground/hazards`, `/ground/hazard_markers`, `/ground/unevenness`. Tested against the indoor bags. |
-| Praveen | `xsens_link` to `base_link` transform measured and published. |
-| Praveen | Second outdoor attempt, with a **surface log** (times and surface types). |
-| Vision | Crack model run on real frames from our bags, not simulation. |
-| Vision | Robot body and gripper mask. |
-| All | 30 minute call: agree the topic names and the record schema. |
+- Depth pipeline running as a ROS 2 node, publishing `/ground/hazards`,
+  `/ground/hazard_markers`, `/ground/unevenness`
+- `xsens_link` to `base_link` transform measured and published
+- Crack model running on real frames from our own bags, not simulation
+- Robot body and gripper mask
+- Topic names and record schema agreed, written down, not changed after
 
-**Gate:** everyone is working on real data from our own robot by Friday.
+**Gate:** everyone working on real data from our own robot.
 
-### Week 2 — 13 to 19 October. Localization.
+### Week 2 — 8 to 14 October. Localization and IMU.
 
-| Who | Deliverable |
-|---|---|
-| Praveen | Indoor map built with SLAM Toolbox and saved. AMCL localizing on it. |
-| Praveen | IMU roughness node: gravity removal, 1 s windows, RMS, peak, FFT bands. |
-| Praveen | Nav2 configured for the Scout: footprint, inflation, controller. |
-| Vision | RGB terrain classifier, first version. |
-| Vision | Annotation under way on frames from our own bags. |
-| Fusion | Record schema fixed and documented. |
+- Indoor map built with SLAM Toolbox and saved; AMCL localizing on it
+- IMU roughness node: gravity removal, 1 s windows, RMS, peak, FFT bands
+- Nav2 configured for the Scout: footprint, inflation, controller
+- RGB terrain classifier, first version
+- Annotation under way on frames from our own bags
 
 **Gate:** the robot drives to a goal on a saved map, by itself.
 
-### Week 3 — 20 to 26 October. Coverage.
+### Week 3 — 15 to 21 October. Coverage and fusion.
 
-| Who | Deliverable |
-|---|---|
-| Praveen | Boustrophedon waypoint generator. Robot sweeps a rectangle indoors. |
-| Praveen | Speed governor between the velocity command and the base. |
-| Praveen | Vibration-based terrain classifier, trained on labelled segments. |
-| Vision | Crack model fine tuned on our own annotated frames. |
-| Fusion | Fusion node joining camera and IMU into records every 0.25 m. |
+- Boustrophedon waypoint generator; robot sweeps a rectangle indoors
+- Speed governor between the velocity command and the base
+- Vibration-based terrain classifier trained on labelled segments
+- Fusion node joining camera and IMU into one record every 0.25 m
+- **Hazard classes A, B and C assigned and stored**
 
-**Gate:** autonomous coverage of a hall, with data recorded throughout.
+**Gate:** autonomous coverage of a hall, recording throughout.
 
-### Week 4 — 27 October to 2 November. Outdoor data.
+### Week 4 — 22 to 28 October. Outdoor data.
 
-| Who | Deliverable |
-|---|---|
-| Praveen | Outdoor localization decided and tested: GPS, live SLAM, or odometry. Written up with numbers. |
-| Praveen | Labelled outdoor runs: pavement, grass, gravel, dirt, slope. Two or three repeats each. |
-| Praveen | EKF fusing wheel odometry, IMU and GPS. |
-| Vision | Terrain classifier trained on outdoor images. |
-| Fusion | Map layer: path coloured by roughness, hazard markers, terrain grid. |
+- Outdoor localization decided and tested: GPS, live SLAM, or odometry.
+  Written up with numbers.
+- Labelled outdoor runs: pavement, grass, gravel, dirt, slope. Two or three
+  repeats of each, with a written log of times and surface types.
+- EKF fusing wheel odometry, IMU and GPS
+- Terrain classifier trained on outdoor images
+- Map layer: path coloured by roughness, hazard markers, terrain grid
 
-**Gate:** a labelled outdoor dataset exists. This is the one that gates every result.
+**Gate:** a labelled outdoor dataset exists. **This is the hardest deadline in
+the plan.** Without it, terrain classification has no results at all.
 
-### Week 5 — 3 to 9 November. Everything together.
+### Week 5 — 29 October to 4 November. Everything together.
 
-| Who | Deliverable |
-|---|---|
-| All | Full pipeline running on one bag, on one laptop. |
-| All | Then the same, live on the robot. |
-| Praveen | Book demo: robot approaches, slows by itself, crosses, IMU spike logged, marker appears on the map. |
-| Fusion | Dashboard showing map, path, hazards and camera live. |
+- Full pipeline on one bag, on one laptop
+- Then the same, live on the robot
+- Book demo: robot approaches, slows by itself, crosses, IMU spike logged,
+  marker appears on the map in class C
+- Live view showing map, path, hazards and camera
 
 **Gate:** the headline demo works end to end. **If it does not work this week,
 cut scope rather than pushing it later.**
 
-### Week 6 — 10 to 16 November. Results.
+### Week 6 — 5 to 11 November. Results.
 
-| Who | Deliverable |
-|---|---|
-| All | Evaluation runs: three repeats of each route. |
-| Praveen | Roughness versus speed over the same stretch at three speeds. |
-| Fusion | Roughness per surface, box plots. |
-| Fusion | **Camera-predicted unevenness against IMU-measured roughness.** This single figure is the project's central claim. |
-| Vision | Crack segmentation results: Dice, IoU, false positives per metre. |
+- Three repeats of each route
+- Roughness versus speed over one stretch at three speeds
+- Roughness per surface, box plots
+- **Camera-predicted unevenness against IMU-measured roughness**
+- Counts of hazard classes A, B and C per route
+- Smallest hazard the robot actually feels, from the crossing trials
+- Crack segmentation results: Dice, IoU, false positives per metre
 
-**Gate:** every figure that goes in the report exists, even if rough.
+**Gate:** every figure that goes in the presentation exists, even if rough.
 
-### Week 7 — 17 to 23 November. Writing.
+### Week 7 — 12 to 18 November. Presentation and video.
 
-| Who | Deliverable |
-|---|---|
-| All | Report draft, complete, all sections. |
-| Fusion | Report generator producing the inspection report automatically. |
-| Praveen | Demo video: indoor book run and outdoor terrain run. |
-| All | Repeat any run whose data turned out to be weak. |
+- Presentation drafted, every slide present
+- Demo video: indoor book run and outdoor terrain run
+- Any run whose data turned out weak, recorded again
 
-**Gate:** a complete draft exists. Nothing is left to be written in the last week.
+**Gate:** a complete draft deck exists. Nothing left to make in the last week.
 
-### Week 8 — 24 to 30 November. Finish.
+### Week 8 — 19 to 25 November. Finish.
 
-| Who | Deliverable |
-|---|---|
-| All | Final report. |
-| All | Presentation. |
-| All | Demo video edited. |
-| Praveen | Short guide so the next group can run the system. |
-| All | Repository tidy: README, interface contracts, how to reproduce every figure. |
+- Final presentation
+- Demo video edited
+- Short guide so the next group can run the system
+- Repository tidy: README, interface contracts, how to reproduce every figure
 
-**No new features this week.** Only finishing.
+**No new features this week.** Only finishing. The few days to the end of
+November are buffer, not working time.
 
 ---
 
@@ -156,36 +177,34 @@ cut scope rather than pushing it later.**
 
 ---
 
-## What could sink this, and what we do about it
+## What could sink this
 
 | Risk | What we do |
 |---|---|
-| **IMU stuck at 10 Hz** | Raised with the professor. Roughness needs 100 Hz or more. Everything else proceeds meanwhile; only the numbers wait. |
-| **No labelled outdoor data by week 4** | Then terrain classification has no results. This is the hardest deadline in the plan. |
+| **IMU stuck at 10 Hz** | Raised with the professor. Roughness needs 100 Hz or more. Everything else proceeds; only the numbers wait. |
+| **No labelled outdoor data by week 4** | Terrain classification then has no results. Hardest deadline in the plan. |
 | **Camera USB dropouts** | Check the camera rate immediately before every recording. Never record blind. |
-| **Robot storage, 12 GB free** | Record 90 s at a time, copy off, delete. Asked for an external SSD. |
+| **Robot storage, 12 GB free** | Record 90 s, copy off, delete. An external SSD has been requested. |
 | **Battery** | Check `/scout_status` voltage at the start of every session. |
-| **Robot time** | Only one of us needs the robot. Everyone else works from bags. |
-| **Work overlapping** | The table above. Revisit it if anyone starts something not on their row. |
+| **Robot time** | Only one person needs the robot. Everyone else works from bags. |
+| **Work overlapping** | Say who is doing what at the weekly sync, before starting. |
 
 ---
 
 ## How we work
 
 **Bags live on the shared drive, not in git.** GitHub rejects files over 100 MB
-and our bags are about 1.7 GB each. The repo holds code, configs and documents.
+and ours are about 1.7 GB each.
 
-Shared drive:
 https://drive.google.com/drive/folders/1jg45KSiKPr-DoeFKEp3v48fnMJFQSeWJ?usp=drive_link
 
 See `docs/DATA.md` for what is there, how to replay it, and how to pull frames
 out for annotation.
 
-**One branch per person**, named after them: `praveen-robot-and-depth`,
-`aritra-crack-detection`. Merge into `main` through a pull request.
+**One branch per person**, named after them. Merge into `main` through a pull
+request.
 
-**Topic names and the record schema are fixed in week 1** and then nobody
-changes them without telling the others. That is what lets three people build
-separately and have it work when joined.
+**Topic names and the record schema are fixed in week 1** and not changed after.
+That is what lets three people build separately and have it join up.
 
 **Weekly 30 minute sync.** What landed, what is blocked, what changes.
