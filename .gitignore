@@ -26,3 +26,9 @@ log/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Rosbags and extracted frames are large and live on the shared drive
+*.mcap
+bags/
+frames/
+*.txt.gz
