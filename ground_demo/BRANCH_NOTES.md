@@ -51,10 +51,48 @@ Depth noise is independent per pixel, so this removes most of it while leaving
 real steps intact. It takes the flat-ground noise floor from 4.2 mm to 1.1 mm
 in simulation.
 
+### Running live: ground_hazard_node.py
+
+The same measurement code as a ROS 2 node, against the robot or a bag replay.
+
+| topic | type | contents |
+|---|---|---|
+| `/ground/hazards` | `vision_msgs/Detection3DArray` | one box per hazard: centre, size, `bump`/`hole` |
+| `/ground/hazard_markers` | `visualization_msgs/MarkerArray` | the same, for RViz, labelled `bump 27 mm` |
+| `/ground/unevenness` | `std_msgs/Float32` | mm RMS of the plane residual |
+| `/ground/residual_cloud` | `sensor_msgs/PointCloud2` | optional, coloured blue/grey/red by signed residual |
+
+```bash
+ros2 bag play bags/corridor_book_1434_indoor_books --loop
+python3 ground_hazard_node.py --ros-args -p use_sim_time:=true -p publish_cloud:=true
+```
+
+Checked against that bag: books reported at **20 to 34 mm**, plane 0.90 to
+0.93 m at 87 to 89 deg, 93 to 97 % inliers, unevenness 4.0 to 5.1 mm. Those
+match the offline numbers above, which is the point of the check.
+
+Three things the node must keep doing, each of which was wrong first time:
+
+**Subscribe with `qos_profile_sensor_data`.** The camera publishes BEST_EFFORT.
+A default RELIABLE subscription receives nothing at all - no error, no warning,
+an empty topic.
+
+**Clip depth to 0.30 - 1.60 m.** Past 1.6 m the D435's noise is larger than the
+20 mm step being measured. Without the clip the far end of a corridor is
+reported as a 12 m deep hole 37 m ahead: long-range noise taken at face value.
+
+**Track the plane between frames.** `refine_plane` from the previous fit first,
+full RANSAC only when that fails. Fitting a 6000-point sample rather than the
+whole frame keeps it inside a frame interval.
+
+`max_size_mm` (default 300) drops depth dropouts at the edge of the floor,
+which otherwise cluster into one hole half a metre deep.
+
 ### Next
 
-Wrap it as a ROS 2 node publishing `/ground/hazards`,
-`/ground/hazard_markers` and `/ground/unevenness`.
+- `xsens_link` to `base_link` transform, once the mounting offset is measured.
+- Run against a bag with ruler-measured objects, to turn "detected 27 mm" into
+  "detected 27 mm, actual 27 mm".
 
 ## tools/
 

@@ -197,6 +197,7 @@ def find_hazards(cloud, valid, resid, nrm, d, thresh, min_area_cm2, fx, fy):
 
             out.append({
                 "type": kind,
+                "centroid": tuple(float(c) for c in centroid),
                 "size_mm": float(np.percentile(np.abs(r), 90) * 1000.0),
                 "median_mm": float(np.median(np.abs(r)) * 1000.0),
                 "area_cm2": area_m2 * 1e4,
