@@ -78,10 +78,37 @@ Floor coloured by signed distance to the fitted plane: blue below, white on it,
 red above, full scale at 40 mm. The box is a detected hazard, labelled with its
 measured height. Clip: `docs/media/first_indoor_book.mp4`.
 
-**A known artefact.** Holes of 25 to 35 mm are sometimes reported beside a book.
-They are occlusion shadows, not dips: the book hides the floor behind it, so
-the depth there is missing or wrong, and the gap clusters as a hole. Worth
-suppressing before any of this is quoted as a false-positive rate.
+**An open question: spurious holes.** Over the 333 processed frames of this
+bag, five holes are reported on what is flat tile. Measured, they are:
+
+| frame | size | range | area | missing depth in bbox | px to nearest bump |
+|---|---|---|---|---|---|
+| 72 | 59 mm | 0.95 m | 27 cm2 | 3 % | 58 |
+| 99 | 19 mm | 0.92 m | 26 cm2 | 0 % | 98 |
+| 188 | 21 mm | 0.95 m | 28 cm2 | 0 % | 42 |
+| 188 | 21 mm | 0.95 m | 49 cm2 | 0 % | 94 |
+| 208 | 27 mm | 0.93 m | 36 cm2 | 35 % | 110 |
+
+Two explanations were tested and both fail:
+
+*Occlusion shadow behind a book* - no. The nearest bump pixel is 42 to 110 px
+away, roughly 100 to 260 mm on the ground. These are not beside anything.
+
+*Range-dependent depth noise* - no. All five sit at 0.92 to 0.95 m, the same
+range as the floor and the books. Re-running with a threshold scaled as
+3 sigma of the D435 error model, `max(15 mm, 3 * 0.00378 * z^2)`, produces
+byte-identical output: 5 holes, 369 bumps, same size ranges. At 0.9 m that
+model gives 3.1 mm, close to the 4.5 mm measured noise floor, so 15 mm is
+already about 5 sigma and nothing changes.
+
+That leaves specular reflection on polished tile as the likeliest cause, which
+is untested. **No filter has been added**, deliberately: anything that
+suppresses a 19 to 59 mm hole on flat ground would also suppress a real
+pothole, and potholes are the outdoor goal. The rate is 5 in 333 frames, 1.5 %.
+
+Resolve it with ground truth rather than by tuning: place a known shallow dip
+in the next recording. If it is detected correctly while these still appear,
+they can be characterised honestly instead of filtered on a hunch.
 
 Three things the node must keep doing, each of which was wrong first time:
 
