@@ -67,9 +67,21 @@ ros2 bag play bags/corridor_book_1434_indoor_books --loop
 python3 ground_hazard_node.py --ros-args -p use_sim_time:=true -p publish_cloud:=true
 ```
 
-Checked against that bag: books reported at **20 to 34 mm**, plane 0.90 to
-0.93 m at 87 to 89 deg, 93 to 97 % inliers, unevenness 4.0 to 5.1 mm. Those
-match the offline numbers above, which is the point of the check.
+Checked against that bag: books reported at **20 to 34 mm**, the stack at
+**86 to 109 mm**, plane 0.90 to 0.93 m at 87 to 89 deg, 93 to 97 % inliers,
+unevenness 4.0 to 5.1 mm. Those match the offline numbers above, which is the
+point of the check.
+
+![Hazard detection in RViz](../docs/media/hazard_rviz.png)
+
+Floor coloured by signed distance to the fitted plane: blue below, white on it,
+red above, full scale at 40 mm. The box is a detected hazard, labelled with its
+measured height. Clip: `docs/media/first_indoor_book.mp4`.
+
+**A known artefact.** Holes of 25 to 35 mm are sometimes reported beside a book.
+They are occlusion shadows, not dips: the book hides the floor behind it, so
+the depth there is missing or wrong, and the gap clusters as a hole. Worth
+suppressing before any of this is quoted as a false-positive rate.
 
 Three things the node must keep doing, each of which was wrong first time:
 
