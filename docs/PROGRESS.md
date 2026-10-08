@@ -99,10 +99,17 @@ The robot outdoors: [robot_outdoor_1618.mp4](media/robot_outdoor_1618.mp4).
 |---|---|
 | GNSS | a fix in 3 of 5 runs, about +-7-10 m. Too coarse for hazard positions |
 | Wheel odometry | misjudges turns by 15-30 deg per run (skid steer) |
-| **Wheel speed + IMU heading** | **best now**: an indoor out-and-back of 26 m ends 0.4-0.6 m from the start, against 4.7 m for wheels alone |
+| **Wheel speed + IMU heading** | **best now**: an indoor out-and-back of 26 m ends 0.4-0.7 m from the start, against 4.7 m for wheels alone |
 | Lidar SLAM (SLAM Toolbox, lab config) | **fails indoors and outdoors** with the current scan, see below |
 
 ![wheels vs IMU heading](media/heading_wheels_vs_imu.png)
+
+The same in ROS with `robot_localization` ([config/ekf_odom_imu.yaml](../config/ekf_odom_imu.yaml):
+forward speed from the wheels, turn rate from the IMU gyro): the 26 m out-and-back
+ends 0.70 m from the start (wheels 4.74 m), and the 35 m outdoor loop 0.37 m
+(wheels 0.97 m). To run it live, `scout_base` must stop publishing its own
+`odom -> base_footprint`, which the lab launch does not allow yet; until then the
+EKF publishes `/odometry/filtered` only.
 
 **Why SLAM fails.** `/scan` is made from the 3D lidar using all points between
 -0.10 and +0.60 m above the floor, so it includes the floor. The lidar's lowest
@@ -137,7 +144,7 @@ remade offline. Then repeat the SLAM test.
 ## Next
 
 1. Fix the scan, repeat SLAM indoors and outdoors, build and save the indoor map.
-2. EKF: wheel speed + IMU heading, then Nav2 to a goal on the saved map.
+2. EKF live on the robot (config ready, tested offline), then Nav2 to a goal on the saved map.
 3. IMU roughness node with the frequency-band feature.
 4. Crack model and terrain classifier on the outdoor bags.
 

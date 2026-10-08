@@ -25,6 +25,27 @@ Passwords show nothing as you type. That is normal.
 
 ---
 
+## Quick way (two scripts)
+
+Copy them to the robot once:
+
+```bash
+scp ~/workspaces/silvanus-terrain-quality-mapping/tools/robot/*.sh agilex@192.168.1.102:~/
+```
+
+Then on the robot:
+
+```bash
+./start_robot.sh            # CAN, finds the Xsens port, checks the camera, starts the stack with the IMU settings
+./record_session.sh garden_surfaces 90   # corrected scan, 12 s check of every topic, then 90 s recording
+```
+
+`record_session.sh` also records `/rslidar_points` (the 3D lidar) and `/scan_fixed`
+(the scan with the floor cut out, see `docs/PROGRESS.md`). The sections below are
+the same steps by hand.
+
+---
+
 ## 1. Connect
 
 ```bash

@@ -11,3 +11,7 @@ sourced.
 | `run_slam.sh BAG OUT SCAN [LO HI]` | SLAM Toolbox with the lab's own config, offline from a bag, isolated on ROS domain 88. With `LO HI` it removes scan beams in that range first (`clean_scan.py`). Writes `OUT_map.pgm/.yaml` and `OUT_poses.csv` (`pose_logger.py`) |
 | `draw_maps.py` | draws those maps with the SLAM and wheel-odometry paths |
 | `deadreck.py BAG...` | dead reckoning with wheel heading, gyro-integrated heading and Xsens heading; prints how far each ends from the start |
+| `run_ekf.sh BAG OUT [PARAMS]` | `robot_localization` EKF offline from a bag with `config/ekf_odom_imu.yaml`, isolated on ROS domain 87; `log_odom.py` writes `/odom` and `/odometry/filtered` to `OUT.csv` |
+
+Robot-side scripts are in `tools/robot/` (`start_robot.sh`, `record_session.sh`); see
+`docs/robot/robot_session_guide.md`.
