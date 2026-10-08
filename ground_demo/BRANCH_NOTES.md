@@ -127,6 +127,51 @@ whole frame keeps it inside a frame interval.
 `max_size_mm` (default 300) drops depth dropouts at the edge of the floor,
 which otherwise cluster into one hole half a metre deep.
 
+### Ground truth run, 2026-10-08
+
+`corridor_groundtruth_1447`: the node's measurement run offline over every
+third depth frame, against tape-measured objects (see `docs/DATA.md`).
+
+| object | true height | camera height | error |
+|---|---|---|---|
+| small foam block | 50 mm | 50 mm (48-52) | 0 |
+| long foam strip 1 | 20 mm | 24 mm | +4 |
+| long foam strip 2 | 20 mm | 24 mm | +4 |
+| wooden block 1 | 15 mm | 20 mm | +5 |
+| wooden block 2 | 15 mm | 23 mm | +8 |
+
+Above the threshold the height is exact. **Objects near the 15 mm threshold
+read 4 to 8 mm high**, because only the pixels above 15 mm are measured, which is
+the top of the noise. Fix: segment at 15 mm, then measure the height over the
+whole object outline at a lower level. Lengths and widths read 1 to 4 cm large
+(the object's sides are counted). Black foam gave valid depth.
+
+**Camera predicts, IMU confirms, first real case.** On plain floor the largest
+vertical jolt in any 1.2 s window of `/filter/free_acceleration` is 0.63 m/s2.
+
+| object | front / rear wheel jolt (m/s2) | class |
+|---|---|---|
+| small foam block, 50 mm | **1.02 / 1.75**, the two largest of the run | C confirmed |
+| wooden block 1, 15 mm | 0.94 / 0.77 | C, probably (at the tyre edge) |
+| foam strips, 20 mm | 0.47 to 0.63 | A, seen not felt: soft foam squashes |
+| wooden block 2 | not crossed | A |
+
+Crossing times are predicted from where the camera saw each object plus
+odometry, front axle +0.249 m, rear -0.249 m, within +-0.6 s.
+
+![camera vs IMU](../docs/media/groundtruth_1447_camera_vs_imu.png)
+
+Found in the same run:
+
+- **The gripper is in the bottom of the depth image.** It produces about 100 mm
+  false bumps and all 5 false holes of this run. A robot-body mask removes them.
+- **The camera looks about 10 degrees backwards** in the arm pose used
+  (joint2 0.861, joint3 -2.284). It sees 0.5 to 1.2 m ahead of the robot centre,
+  about 4 s of warning at 0.21 m/s.
+- **Camera height disagrees by 5 cm:** TF 0.79 m, plane fit 0.84 m. The URDF
+  puts the wheel centre 16.5 cm above the floor; Silvanus has larger tyres. To
+  check: tape from floor to wheel centre.
+
 ### Next
 
 - ~~`xsens_link` to `base_link` transform~~ Done 2026-10-08, see `docs/robot/imu_mount.md`.

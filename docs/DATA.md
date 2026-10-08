@@ -13,6 +13,7 @@ https://drive.google.com/drive/folders/1jg45KSiKPr-DoeFKEp3v48fnMJFQSeWJ?usp=dri
 |---|---|---|---|
 | `corridor_book_1338_indoor` | 33 s | indoor, tile floor | plain floor, nothing placed |
 | `corridor_book_1434_indoor_books` | 33 s | indoor, tile floor | books placed as bumps, driven over |
+| `corridor_groundtruth_1447` | 40 s | indoor, tile floor | tape-measured objects, see below. IMU at 100 Hz, `/filter/free_acceleration` included |
 
 Both recorded 2026-10-01. **Every topic at 100% of its nominal rate, no dropped
 messages.**
@@ -69,6 +70,25 @@ is needed before any detector runs on these images.
 ground plane found in every frame, 92 to 98 % inliers, books detected at
 24 to 33 mm and a taller stack at 86 to 119 mm, unevenness 4.0 to 4.9 mm RMS on
 flat tile.
+
+## Ground truth: `corridor_groundtruth_1447`
+
+Recorded 2026-10-08. Straight run of 8 m at about 0.21 m/s. Every topic complete:
+camera 30 Hz, `/imu/data` and `/filter/free_acceleration` 100 Hz, odometry 50 Hz.
+
+| Object | Length x width x height (cm) | Wheels over it |
+|---|---|---|
+| small black foam block | 25.5 x 20.5 x **5.0** | right side |
+| long black foam strip 1 | 94 x 20 x **2.0** | right side |
+| wooden block 1 | 31.5 x 6.5 x **1.5** | right side, at the tyre edge |
+| wooden block 2 | 31.5 x 6.5 x **1.5** | passed between the wheels |
+| long black foam strip 2 | 96 x 20 x **2.0** | both sides |
+
+Objects about 0.6 to 0.7 m to the left of the path are table legs, not ground
+truth. Results are in `ground_demo/BRANCH_NOTES.md`.
+
+**IMU timestamps arrive in bursts** (74 % of messages less than 2 ms apart, though
+the rate is exactly 100 Hz). Use message order, not header stamps, for spacing.
 
 ## Still to collect
 
