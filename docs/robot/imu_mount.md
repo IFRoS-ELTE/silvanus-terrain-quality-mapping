@@ -49,10 +49,14 @@ The lab stack has no transform for the Xsens until it is given one. Give it at
 ```bash
 ls -l /dev/serial/by-id/          # find the Xsens line, note ../../ttyUSBn
 cd /opt/silvanus
-XSENS_PARENT_FRAME=base_link XSENS_X=0.0 XSENS_Y=-0.015 XSENS_Z=0.115 \
+XSENS_BAUDRATE=921600 XSENS_PARENT_FRAME=base_link XSENS_X=0.0 XSENS_Y=-0.015 XSENS_Z=0.115 \
 XSENS_ROLL=0.0 XSENS_PITCH=0.0 XSENS_YAW=0.0 \
 ./silvanus-up.sh --no-base --xsens=/dev/ttyUSBn --detach
 ```
+
+`XSENS_BAUDRATE=921600` is required since the sensor was reconfigured (see
+below). Without it the driver opens the port at 115200 and cannot talk to the
+sensor.
 
 `--no-base` is for checking only. For a normal session use the same `XSENS_...`
 part in front of the start command you need from the session guide.
@@ -103,8 +107,42 @@ average rate: 9.8 to 10.4
 with gravity already removed by the Xsens, in a world frame with z up. Vertical
 roughness is the RMS of its z. It does not depend on the transform above.
 
-Bags recorded before 2026-10-08 have only `/imu/data`. Record
+Bags recorded before 2026-10-08 have only `/imu/data`, at 10 Hz. Record
 `/filter/free_acceleration` from now on.
 
-The IMU runs at **10 Hz**, so nothing above 5 Hz is visible in an FFT. Raising
-it needs a baudrate change on the sensor; see the lab's `xsens_mti_node.yaml`.
+Measured on the robot after the change: `/imu/data` and
+`/filter/free_acceleration` both **100 Hz**. Messages arrive in small bursts
+(gaps of 0 to 48 ms between them), so check the spacing of the header stamps
+before running an FFT on them.
+
+---
+
+## Sensor configuration (changed 2026-10-08)
+
+The MTi-670 was at 10 Hz on every output, which is too slow for vibration:
+an FFT sees nothing above 5 Hz and a wheel striking an edge falls between
+samples. It was reconfigured with MT Manager 2022.0 from a laptop, with the
+board's USB cable moved from the robot to the laptop. The settings are stored
+in the sensor and survive power-off.
+
+| Setting | Before | After |
+|---|---|---|
+| RS232 baudrate | 115200 | **921600** |
+| UART baudrate | 115200 | **921600** |
+| Xbus output: Orientation (quaternion) | 10 Hz | **100 Hz** |
+| Xbus output: Inertial data (Δq, Δv, rate of turn, acceleration, free acceleration) | 10 Hz | **100 Hz** |
+| Magnetic field, temperature, pressure, position and velocity | 10 Hz | 10 Hz, unchanged |
+| GNSS receiver link (u-blox MAX-M8) | 115200, 4 Hz | unchanged |
+
+Nothing was switched off, so every topic the driver published before still
+exists. Device ID `0080001528`, firmware 1.0.0 build 1450.
+
+The baudrate had to rise first: at 115200 baud the outputs above cannot fit
+through the serial link at 100 Hz.
+
+**To undo:** connect MT Manager, set both baudrates back to 115200 and the two
+rows back to 10 Hz, Apply, and start the robot without `XSENS_BAUDRATE`.
+
+MT Manager on Ubuntu 24.04 needs two old libraries (ICU 60 and
+`libdouble-conversion.so.1`). A working install with a start script is at
+`~/tools/xsens/` on Praveen's laptop.

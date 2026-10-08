@@ -79,7 +79,7 @@ start, every time**: the lab stack has no Xsens transform otherwise.
 
 ```bash
 ls -l /dev/serial/by-id/          # the Xsens line ends in ../../ttyUSBn; the number changes per boot
-XSENS_PARENT_FRAME=base_link XSENS_X=0.0 XSENS_Y=-0.015 XSENS_Z=0.115 \
+XSENS_BAUDRATE=921600 XSENS_PARENT_FRAME=base_link XSENS_X=0.0 XSENS_Y=-0.015 XSENS_Z=0.115 \
 XSENS_ROLL=0.0 XSENS_PITCH=0.0 XSENS_YAW=0.0 \
 ./silvanus-up.sh --arm=192.168.1.219 --no-gripper --xsens=/dev/ttyUSBn --detach
 ```

@@ -198,7 +198,6 @@ November are buffer, not working time.
 
 | Risk | What we do |
 |---|---|
-| **IMU stuck at 10 Hz** | Roughness needs 100 Hz or more. Everything else proceeds; only the numbers wait. |
 | **No labelled outdoor data by week 4** | Terrain classification then has no results. Hardest deadline in the plan. |
 | **Camera USB dropouts** | Check the camera rate immediately before every recording. Never record blind. |
 | **Robot storage** | Record 90 s, copy off, delete. |
