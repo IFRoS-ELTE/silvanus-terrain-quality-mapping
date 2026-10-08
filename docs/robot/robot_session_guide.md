@@ -72,6 +72,20 @@ sudo docker logs -f silvanus        # watch it start; Ctrl-C only stops the log 
 
 Wait for `Successfully switched controllers` and `xArm is ready to move`.
 
+### With the IMU
+
+Add `--xsens=/dev/ttyUSBn` and put the mounting transform in front. **Every
+start, every time**: the lab stack has no Xsens transform otherwise.
+
+```bash
+ls -l /dev/serial/by-id/          # the Xsens line ends in ../../ttyUSBn; the number changes per boot
+XSENS_PARENT_FRAME=base_link XSENS_X=0.0 XSENS_Y=-0.015 XSENS_Z=0.115 \
+XSENS_ROLL=0.0 XSENS_PITCH=0.0 XSENS_YAW=0.0 \
+./silvanus-up.sh --arm=192.168.1.219 --no-gripper --xsens=/dev/ttyUSBn --detach
+```
+
+Where these numbers come from, and how to check them: [imu_mount.md](imu_mount.md).
+
 ## 4. Check from the laptop
 
 ```bash
@@ -191,6 +205,7 @@ mkdir -p /bags
 ros2 bag record -s mcap -o "/bags/run-$(date +%Y%m%d-%H%M%S)" \
   /camera/camera/color/image_raw /camera/camera/color/camera_info \
   /camera/camera/depth/image_rect_raw /camera/camera/depth/camera_info \
+  /imu/data /filter/free_acceleration /gnss \
   /odom /scan /tf /tf_static /joint_states /scout_status
 ```
 
@@ -256,7 +271,7 @@ Stopping a process is not an emergency stop.
 - [ ] Arm posed, joint values and photo recorded
 - [ ] `base_footprint` to camera transform measured, `ground_cam` published
 - [ ] Wheelbase and track width measured with a tape
-- [ ] Xsens mounting transform measured (six numbers) once the device works
+- [x] Xsens mounting transform measured (six numbers): [imu_mount.md](imu_mount.md)
 - [ ] Does the RC remote publish to `/cmd_vel`? Run `ros2 topic hz /cmd_vel` while someone drives with it
 - [ ] First bag recorded and verified with `ros2 bag info`
 - [ ] Email Renatto: NoMachine, udev rules, disk space

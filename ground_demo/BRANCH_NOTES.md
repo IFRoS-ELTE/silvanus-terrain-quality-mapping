@@ -129,7 +129,7 @@ which otherwise cluster into one hole half a metre deep.
 
 ### Next
 
-- `xsens_link` to `base_link` transform, once the mounting offset is measured.
+- ~~`xsens_link` to `base_link` transform~~ Done 2026-10-08, see `docs/robot/imu_mount.md`.
 - Run against a bag with ruler-measured objects, to turn "detected 27 mm" into
   "detected 27 mm, actual 27 mm".
 
