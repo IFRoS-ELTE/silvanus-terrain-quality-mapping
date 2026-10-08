@@ -107,8 +107,6 @@ at least these, and write down what we find:
 
 The full labelled dataset comes in week 4. This is the reconnaissance run.
 
-**Depends on the robot battery**, which went flat and is on charge.
-
 ### Week 2 — 8 to 14 October. Localization and IMU.
 
 - Indoor map built with SLAM Toolbox and saved; AMCL localizing on it
@@ -200,10 +198,10 @@ November are buffer, not working time.
 
 | Risk | What we do |
 |---|---|
-| **IMU stuck at 10 Hz** | Raised with the professor. Roughness needs 100 Hz or more. Everything else proceeds; only the numbers wait. |
+| **IMU stuck at 10 Hz** | Roughness needs 100 Hz or more. Everything else proceeds; only the numbers wait. |
 | **No labelled outdoor data by week 4** | Terrain classification then has no results. Hardest deadline in the plan. |
 | **Camera USB dropouts** | Check the camera rate immediately before every recording. Never record blind. |
-| **Robot storage, 12 GB free** | Record 90 s, copy off, delete. An external SSD has been requested. |
+| **Robot storage** | Record 90 s, copy off, delete. |
 | **Battery** | Check `/scout_status` voltage at the start of every session. |
 | **Robot time** | Only one person needs the robot. Everyone else works from bags. |
 | **Work overlapping** | Say who is doing what at the weekly sync, before starting. |
