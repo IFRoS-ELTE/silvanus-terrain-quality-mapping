@@ -29,6 +29,7 @@ the plan in [MILESTONES.md](MILESTONES.md). Data: [DATA.md](DATA.md).
 | RGB terrain classifier, first version | open; 5 labelled outdoor surfaces are ready |
 | Annotation from our own bags | open |
 | **Gate:** robot drives to a goal on a saved map | not yet, needs the scan fixed first |
+| Week 3, started early: zigzag coverage sweep | tool written ([navigation/](../navigation/README.md)); in the lab simulator the skid-steer turns at less than half the commanded rate, so Nav2 cannot follow it yet |
 
 ---
 
