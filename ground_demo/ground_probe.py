@@ -157,19 +157,30 @@ def plane_basis(nrm):
     return fwd, right
 
 
-def find_hazards(cloud, valid, resid, nrm, d, thresh, min_area_cm2, fx, fy):
-    """Cluster the points that stand off the plane into holes and bumps."""
+def find_hazards(cloud, valid, resid, nrm, d, thresh, min_area_cm2, fx, fy,
+                 grow_frac=0.5):
+    """Cluster the points that stand off the plane into holes and bumps.
+
+    A hazard is detected where the residual passes `thresh`, but its height is
+    measured over the outline grown down to `grow_frac * thresh`. Measuring only
+    the pixels above the threshold keeps the top of the noise and reads thin
+    objects high: a 15 mm board came out at 22 mm, a 20 mm strip at 24 mm.
+    Over the grown outline the median is within a few mm on every tape-measured
+    object (docs/DATA.md, BRANCH_NOTES.md).
+    """
     fwd, right = plane_basis(nrm)
     origin_on_plane = -d * nrm          # the camera's own footprint on the plane
     out = []
 
-    for kind, sel in (("bump", (resid > thresh) & valid),
-                      ("hole", (resid < -thresh) & valid)):
+    for kind, sgn in (("bump", 1.0), ("hole", -1.0)):
+        sel = (sgn * resid > thresh) & valid
         m = sel.astype(np.uint8)
         if not m.any():
             continue
         m = cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
         n_lab, lab, stats, _ = cv2.connectedComponentsWithStats(m, connectivity=8)
+        low = ((sgn * resid > grow_frac * thresh) & valid).astype(np.uint8)
+        _, lab_low = cv2.connectedComponents(low, connectivity=8)
         for i in range(1, n_lab):
             if stats[i, cv2.CC_STAT_AREA] < 40:
                 continue
@@ -195,10 +206,14 @@ def find_hazards(cloud, valid, resid, nrm, d, thresh, min_area_cm2, fx, fy):
             centroid = pts.mean(axis=0)
             ahead = float((centroid - origin_on_plane) @ fwd)
 
+            ids = np.unique(lab_low[blob])
+            grown = np.isin(lab_low, ids[ids > 0])
+
             out.append({
                 "type": kind,
                 "centroid": tuple(float(c) for c in centroid),
-                "size_mm": float(np.percentile(np.abs(r), 90) * 1000.0),
+                "size_mm": float(np.median(np.abs(resid[grown])) * 1000.0),
+                "peak_mm": float(np.percentile(np.abs(r), 90) * 1000.0),
                 "median_mm": float(np.median(np.abs(r)) * 1000.0),
                 "area_cm2": area_m2 * 1e4,
                 "length_mm": length * 1000.0,

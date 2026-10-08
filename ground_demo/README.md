@@ -74,10 +74,13 @@ what sets the usable band, which sets the arm pose.
 relative to the flat-ground baseline at the same range. That is why `flat_calib`
 is logged first.
 
-**size** for a hazard is the 90th percentile of the absolute residual in its
-blob, not the maximum. The maximum tracks the tail of the depth noise and
-overestimates badly: on a 25 mm test object it reads about 40 mm. The 90th
-percentile reads about 26 mm. The median is logged alongside it.
+**size** for a hazard is its height: the median absolute residual over the
+hazard's outline grown down to half the threshold. The hazard is still detected
+at the full threshold. Measuring only the pixels above the threshold keeps the
+top of the noise and reads thin objects 4 to 10 mm high; on 24 tape-measured
+passes the grown median is off by 1.7 mm on average (see `BRANCH_NOTES.md`).
+`peak_mm`, the 90th percentile of the pixels above the threshold, is kept
+alongside it.
 
 The residual field is median filtered 5x5 before anything is measured. Depth
 noise is independent per pixel, so this removes most of it while leaving real

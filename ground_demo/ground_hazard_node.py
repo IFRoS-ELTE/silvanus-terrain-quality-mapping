@@ -38,6 +38,7 @@ purpose. Measuring every third frame at 10 Hz is honest; pretending to run at
 """
 
 import math
+import os
 
 import cv2
 import numpy as np
@@ -100,6 +101,11 @@ class GroundHazardNode(Node):
         # robot can drive over is a third of a metre deep, so cap it rather
         # than publish a marker the size of the room.
         self.declare_parameter("max_size_mm", 300.0)
+        # The D435 is fixed to the gripper, so the gripper blocks the same pixels
+        # in every arm pose. The edge of that region produces flying pixels that
+        # were read as ~100 mm bumps and false holes. Empty string disables it.
+        self.declare_parameter("robot_mask", os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "robot_mask_d435_gripper.png"))
         self.declare_parameter("process_every_n", 3)
         self.declare_parameter("publish_cloud", False)
         self.declare_parameter("cloud_stride", 4)
@@ -115,6 +121,14 @@ class GroundHazardNode(Node):
         self.publish_cloud = bool(g("publish_cloud"))
         self.cloud_stride = max(1, int(g("cloud_stride")))
         self.marker_lifetime = float(g("marker_lifetime_s"))
+        self.mask_ok = None     # True where the image shows ground, not the robot
+        path = str(g("robot_mask"))
+        if path:
+            mask = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+            if mask is None:
+                self.get_logger().warn(f"robot_mask {path} not readable; running without it")
+            else:
+                self.mask_ok = mask > 0
 
         self.k = None           # (fx, fy, ppx, ppy), filled by the info callback
         self.frame_count = 0
@@ -176,6 +190,8 @@ class GroundHazardNode(Node):
         fx, fy, ppx, ppy = self.k
         cloud = deproject(depth_m, fx, fy, ppx, ppy)
         valid = (depth_m > self.zmin) & (depth_m < self.zmax)
+        if self.mask_ok is not None and self.mask_ok.shape == valid.shape:
+            valid &= self.mask_ok
 
         pts = cloud[valid]
         if len(pts) < 500:
@@ -217,7 +233,7 @@ class GroundHazardNode(Node):
 
         hazards = find_hazards(cloud, valid, resid, nrm, d,
                                self.threshold_m, self.min_area_cm2, fx, fy)
-        hazards = [h for h in hazards if h["size_mm"] <= self.max_size_mm]
+        hazards = [h for h in hazards if h["peak_mm"] <= self.max_size_mm]
 
         self.publish_detections(hazards, nrm, inlier_frac, header)
         self.publish_markers(hazards, nrm, header)

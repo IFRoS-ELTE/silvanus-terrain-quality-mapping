@@ -40,11 +40,25 @@ Two independent methods, TF and plane fitting, agree on the camera pose.
 **Noise floor is about 4.5 mm on real tile**, so the hazard threshold is set at
 15 mm. Anything smaller cannot be separated from sensor noise at this height.
 
-### Two measurement choices worth knowing
+### Three measurement choices worth knowing
 
-Object size is the **90th percentile** of the absolute residual in the blob,
-not the maximum. The maximum tracks the tail of the depth noise and reads 40 mm
-on a 25 mm object; the 90th percentile reads 26 mm.
+A hazard is **detected** where the residual passes 15 mm, but its **height is
+the median over the outline grown down to 7.5 mm** (half the threshold).
+Measuring only the pixels above 15 mm keeps the top of the noise: thin objects
+read 4 to 10 mm high. Against 24 tape-measured object passes (see "Depth fixes"
+below) the mean error went from 4.1 mm to 1.7 mm. The old value is still
+reported as `peak_mm` (90th percentile of the pixels above the threshold).
+
+The residual field is **median filtered 5x5** before anything is measured.
+Depth noise is independent per pixel, so this removes most of it while leaving
+real steps intact. It takes the flat-ground noise floor from 4.2 mm to 1.1 mm
+in simulation.
+
+**The gripper is masked out.** The D435 is fixed to the gripper, so the gripper
+blocks the same pixels in every arm pose: the bottom quarter of the depth image.
+Its edge produces flying pixels that were read as ~100 mm bumps and false holes.
+`robot_mask_d435_gripper.png` (black = robot, 15 px margin) is applied by the node;
+it was made from pixels with no depth in more than 80 % of 913 frames from 4 bags.
 
 The residual field is **median filtered 5x5** before anything is measured.
 Depth noise is independent per pixel, so this removes most of it while leaving
@@ -110,6 +124,10 @@ Resolve it with ground truth rather than by tuning: place a known shallow dip
 in the next recording. If it is detected correctly while these still appear,
 they can be characterised honestly instead of filtered on a hunch.
 
+**Update 2026-10-08:** with the gripper mask, **2 of the 5 are gone** (frames 72
+and 208, rows 362-408: the gripper edge). The other 3 sit mid-image on the right
+(columns 705-750, rows 41-301) and are still unexplained.
+
 Three things the node must keep doing, each of which was wrong first time:
 
 **Subscribe with `qos_profile_sensor_data`.** The camera publishes BEST_EFFORT.
@@ -124,8 +142,8 @@ reported as a 12 m deep hole 37 m ahead: long-range noise taken at face value.
 full RANSAC only when that fails. Fitting a 6000-point sample rather than the
 whole frame keeps it inside a frame interval.
 
-`max_size_mm` (default 300) drops depth dropouts at the edge of the floor,
-which otherwise cluster into one hole half a metre deep.
+`max_size_mm` (default 300, compared against `peak_mm`) drops depth dropouts at
+the edge of the floor, which otherwise cluster into one hole half a metre deep.
 
 ### Ground truth run, 2026-10-08
 
@@ -172,11 +190,38 @@ Found in the same run:
   puts the wheel centre 16.5 cm above the floor; Silvanus has larger tyres. To
   check: tape from floor to wheel centre.
 
+### Depth fixes, 2026-10-08
+
+Tested on all three indoor ground-truth runs (`corridor_groundtruth_1447`,
+`crossing_slow_1652`, `crossing_fast_1703`): 24 passes over 5 tape-measured
+objects, the gripper mask on in both columns.
+
+| object | true | old height | new height |
+|---|---|---|---|
+| foam block | 50 mm | 50 | 47 |
+| book | 30 mm | 33-34 | 26-27 |
+| foam strip | 20 mm | 23-24 | 19-21 |
+| long plank | 20 mm | 22-25 | 18-20 |
+| wooden block | 15 mm | 20-25 | 15-19 |
+| **all 24 passes** | | **mean error 4.1 mm, max 9.9, bias +4.1** | **mean 1.7 mm, max 4.3, bias -0.6** |
+
+Detection is unchanged (still triggered at 15 mm), so nothing new is found or
+lost. The simulated self-test size error went from +1.0-1.5 mm to -0.2-0.4 mm.
+Measuring length and width from the top surface only was also tried and made
+thin objects worse (wood 309 -> 354 mm, true 315), so size is unchanged.
+
+With the mask, holes dropped 5 -> 0 (`corridor_groundtruth_1447`), 29 -> 20 and
+27 -> 16 (crossing runs). Of the 36 left, 29 appear while an object is in view,
+on the floor just past it, which the camera sees badly.
+
+Reproduce: `tools/analysis/eval_groundtruth.py` then `score_groundtruth.py`.
+
 ### Next
 
 - ~~`xsens_link` to `base_link` transform~~ Done 2026-10-08, see `docs/robot/imu_mount.md`.
-- Run against a bag with ruler-measured objects, to turn "detected 27 mm" into
-  "detected 27 mm, actual 27 mm".
+- ~~Run against a bag with ruler-measured objects~~ Done, see above.
+- The 3 remaining unexplained holes from 2026-10-01.
+- Holes on the floor just past raised objects.
 
 ## tools/
 
