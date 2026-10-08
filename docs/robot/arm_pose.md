@@ -136,7 +136,8 @@ every later trajectory.
 ## Still outstanding
 
 - [ ] Photo of the arm from the side
-- [ ] Scout 2.0 wheelbase and track width, wheel centre to wheel centre.
-      Person C needs both for the wheel-track test that assigns hazard states.
+- [x] Scout 2.0 wheelbase and track width, wheel centre to wheel centre:
+      **0.498 m** and **0.583 m**. These are the URDF values (`scout_v2.xacro`);
+      a tape on 2026-10-08 read about 50 and 58 cm, so they hold.
 - [ ] Decide and record whether to keep the near-vertical view or tilt forward
       for more lookahead.

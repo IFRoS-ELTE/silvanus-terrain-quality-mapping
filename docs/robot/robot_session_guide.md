@@ -270,7 +270,7 @@ Stopping a process is not an emergency stop.
 
 - [ ] Arm posed, joint values and photo recorded
 - [ ] `base_footprint` to camera transform measured, `ground_cam` published
-- [ ] Wheelbase and track width measured with a tape
+- [x] Wheelbase and track width measured with a tape: about 50 and 58 cm, matching the URDF (0.498 m and 0.58306 m in `scout_v2.xacro`)
 - [x] Xsens mounting transform measured (six numbers): [imu_mount.md](imu_mount.md)
 - [ ] Does the RC remote publish to `/cmd_vel`? Run `ros2 topic hz /cmd_vel` while someone drives with it
 - [ ] First bag recorded and verified with `ros2 bag info`
