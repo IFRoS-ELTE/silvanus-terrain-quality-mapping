@@ -221,6 +221,10 @@ while r.has_next():
         p = cloud[y:y + hh, x:x + w][sel]
         if len(p) >= 20:
             u = Kc[0] * (p[:, 0] + DEPTH_TO_COLOR_X) / p[:, 2] + Kc[2]; v = Kc[1] * p[:, 1] / p[:, 2] + Kc[3]
+            inside = (u >= 0) & (u < cimg.shape[1]) & (v >= 0) & (v < cimg.shape[0])
+            if inside.mean() < 0.5:      # the depth camera sees wider than the colour camera
+                continue
+            u, v = u[inside], v[inside]
             u0, u1 = np.percentile(u, [2, 98]).astype(int); v0, v1 = np.percentile(v, [2, 98]).astype(int)
             cv2.rectangle(cimg, (u0, v0), (u1, v1), BLACK, 4); cv2.rectangle(cimg, (u0, v0), (u1, v1), WHITE, 2)
             label(cimg, f"{h['type']} {h['size_mm']:.0f} mm", (u0, v0 - 8 if v0 > 30 else v1 + 26), 0.6, WHITE)

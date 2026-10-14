@@ -82,6 +82,11 @@ the run. That is the first confirmed hazard.
 
 ![outdoor surfaces](media/outdoor_surfaces.jpg)
 
+Top: the robot camera. Middle: what the depth camera measures on the same frame,
+height above the fitted ground (white flat, red up, blue down). Asphalt and the red path
+are smooth with faint stripes from the depth camera itself; wood chips and grass are
+patchy. One typical frame per surface; the numbers are the medians over all runs.
+
 | surface | camera unevenness | IMU: fast / slow shaking |
 |---|---|---|
 | asphalt (plain and cracked) | 3.9 mm | 2.2 |
@@ -98,12 +103,14 @@ speed. Hard asphalt shakes fast, soft ground slow. This needs the 100 Hz IMU; at
 the old 10 Hz the 8-50 Hz band could not be seen. Asphalt vs grass from one
 threshold: 97 % correct from the camera, 91 % from the IMU.
 
-A whole outdoor run as the robot saw it: [outdoor_run_1628.mp4](media/outdoor_run_1628.mp4)
-(90 s). Top: camera and height map with detections. Bottom: the path so far (wheel
-speed + IMU heading) coloured by the logged surface, and the two roughness numbers
-over time; the IMU number is grey when the speed is outside 0.25-0.50 m/s. Last frame:
+One whole run, `garden_surfaces_1628`: the path, and both roughness numbers along it.
+Both change when the surface changes. The IMU number only counts at 0.25-0.50 m/s
+(black dots); at other speeds it is grey.
 
-![outdoor run 1628, last frame](media/outdoor_run_1628.jpg)
+![outdoor run 1628](media/outdoor_run_1628.png)
+
+The same run as a video, camera and height map with detections on top:
+[outdoor_run_1628.mp4](media/outdoor_run_1628.mp4) (90 s).
 
 On grass and wood chips the 15 mm threshold also boxes tufts and leaves as 12-19 mm
 bumps, so off pavement the threshold has to follow the surface's unevenness.

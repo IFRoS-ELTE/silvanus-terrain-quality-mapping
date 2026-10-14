@@ -11,6 +11,7 @@ sourced.
 | `groundtruth_objects.py` | the tape-measured objects and when each one is in view in each bag; used by the scripts above and below |
 | `render_detection.py BAG T0 T1 OUT` | full-resolution video of the detection (camera with boxes, height map) and a still of each object with measured vs tape height. `~/bags/crossing_slow_1652 5 42` made `docs/media/crossing_detection.mp4` and `detection_objects.jpg` |
 | `render_outdoor.py BAG OUT` | the same for an outdoor run, with the path (wheel speed + IMU heading) coloured by the logged surface, camera unevenness and IMU fast/slow ratio over time. `~/bags/garden_surfaces_1628` made `docs/media/outdoor_run_1628.mp4` |
+| `outdoor_figures.py OUT_DIR` | `outdoor_surfaces.jpg` (camera and height map of a typical frame on each surface) and `outdoor_run_1628.png` (path, camera unevenness and IMU ratio of one run, with the median of each stretch) |
 | `run_slam.sh BAG OUT SCAN [LO HI]` | SLAM Toolbox with the lab's own config, offline from a bag, isolated on ROS domain 88. With `LO HI` it removes scan beams in that range first (`clean_scan.py`). Writes `OUT_map.pgm/.yaml` and `OUT_poses.csv` (`pose_logger.py`) |
 | `draw_maps.py` | draws those maps with the SLAM and wheel-odometry paths |
 | `deadreck.py BAG...` | dead reckoning with wheel heading, gyro-integrated heading and Xsens heading; prints how far each ends from the start |
