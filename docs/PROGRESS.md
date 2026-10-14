@@ -38,8 +38,14 @@ the plan in [MILESTONES.md](MILESTONES.md). Data: [DATA.md](DATA.md).
 ![depth detection](media/crossing_detection.gif)
 
 Left the robot camera, right the height of every point above the fitted floor
-(red up, blue down). Boxes are detected hazards, labelled with their size.
-Full quality: [crossing_detection.mp4](media/crossing_detection.mp4).
+(red up, blue down). Green boxes are the tape-measured objects, labelled with the
+measured height and the tape height. The clip is 14 s of the slow run; the full
+37 s with all five objects: [crossing_detection.mp4](media/crossing_detection.mp4).
+
+Each object on a typical frame, with its median height over all the frames where
+it is fully in view (slow run):
+
+![each object, measured vs tape](media/detection_objects.jpg)
 
 Tested against objects measured with a tape, 24 passes over 3 runs:
 
