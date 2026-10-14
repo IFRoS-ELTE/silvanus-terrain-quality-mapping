@@ -98,7 +98,17 @@ speed. Hard asphalt shakes fast, soft ground slow. This needs the 100 Hz IMU; at
 the old 10 Hz the 8-50 Hz band could not be seen. Asphalt vs grass from one
 threshold: 97 % correct from the camera, 91 % from the IMU.
 
-The robot outdoors: [robot_outdoor_1618.mp4](media/robot_outdoor_1618.mp4).
+A whole outdoor run as the robot saw it: [outdoor_run_1628.mp4](media/outdoor_run_1628.mp4)
+(90 s). Top: camera and height map with detections. Bottom: the path so far (wheel
+speed + IMU heading) coloured by the logged surface, and the two roughness numbers
+over time; the IMU number is grey when the speed is outside 0.25-0.50 m/s. Last frame:
+
+![outdoor run 1628, last frame](media/outdoor_run_1628.jpg)
+
+On grass and wood chips the 15 mm threshold also boxes tufts and leaves as 12-19 mm
+bumps, so off pavement the threshold has to follow the surface's unevenness.
+
+The robot outdoors, from a phone: [robot_outdoor_1618.mp4](media/robot_outdoor_1618.mp4).
 
 ## 4. Outdoor localization
 
@@ -144,6 +154,7 @@ remade offline. Then repeat the SLAM test.
 | problem | effect | next step |
 |---|---|---|
 | `/scan` contains the floor | SLAM and Nav2 unusable | change `min_height` in the lab bring-up |
+| Depth threshold outdoors | tufts and leaves on grass and wood chips boxed as 12-19 mm bumps | threshold that follows the surface's unevenness |
 | D435 drops off USB | 5 times on 2026-10-08, after fast or rough driving | secure the cable; report to the lab |
 | Wheel odometry heading | 15-30 deg error per run | fuse IMU heading with `robot_localization` |
 | GNSS | +-7-10 m, no fix in 2 of 5 runs | use for rough placement only |
