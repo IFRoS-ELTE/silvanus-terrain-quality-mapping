@@ -94,6 +94,11 @@ patchy. One typical frame per surface; the numbers are the medians over all runs
 | wood chips | 7.5 mm | 0.41 |
 | grass / dirt | 6.8 mm | 0.29 |
 
+Camera unevenness is the RMS height of the ground points around the fitted plane, in
+each frame. For reference, the flat tile floor indoors reads 3.4-3.7 mm: that is the
+depth camera's own noise. So asphalt and the red path are as flat as the camera can
+tell, and grass and wood chips are clearly rougher.
+
 Depth works in daylight: 96 % of pixels valid, floor found in every frame.
 
 The planned roughness number, the RMS of vertical acceleration, **does not
