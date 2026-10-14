@@ -2,6 +2,7 @@
 
     python scripts/train.py --config configs/smoke_cpu.yaml
     python scripts/train.py --config configs/unet_public.yaml train.epochs=80
+    python scripts/train.py --config configs/finetune_robot.yaml model.init_from=models/crack_unet16_v1.pt
 
 Every run gets its own folder under runs/ with:
     config.yaml   the exact config used, including command line overrides
@@ -109,6 +110,18 @@ def main():
 
     model = build_model(cfg["model"]).to(device)
     log.info("Model: %s with %.2fM parameters", cfg["model"]["name"], count_parameters(model) / 1e6)
+
+    # Fine-tuning: start from the weights of an earlier run instead of from
+    # scratch. Only the weights are taken; optimizer, schedule and epoch
+    # count start fresh, because the new run has its own data and settings.
+    init_from = cfg["model"].get("init_from")
+    if init_from:
+        ckpt = torch.load(resolve_path(init_from), map_location=device, weights_only=False)
+        if ckpt["config"]["model"].get("base_channels") != cfg["model"].get("base_channels"):
+            raise ValueError("init_from checkpoint has a different base_channels than this config")
+        model.load_state_dict(ckpt["model"])
+        log.info("Initialised from %s (epoch %d, val Dice %.4f)",
+                 init_from, ckpt["epoch"], ckpt["val_metrics"]["dice"])
 
     criterion = BceDiceLoss(**cfg["loss"]).to(device)
     t = cfg["train"]

@@ -1,0 +1,50 @@
+# Fine-tune the public-data model on our own robot frames.
+#
+#   python scripts/train.py --config configs/finetune_robot.yaml
+#
+# Starts from the base model instead of from scratch. Public data stays in
+# the training mix so the model does not forget what it learned there,
+# while validation and test only use robot frames, because that is the
+# camera, height and ground we care about. Needs data/raw/robot/ prepared
+# first, see docs/crack_model.md.
+
+experiment: unet16_finetune_robot
+seed: 42
+device: auto
+output_dir: runs
+
+data:
+  processed_root: data/processed
+  train_sources: [deepcrack, crackforest, robot]
+  eval_sources: [robot]
+  crop_size: 256
+  crack_bias: 0.5
+  photometric: 0.25
+  num_workers: 4
+
+model:
+  name: unet
+  base_channels: 16
+  depth: 4
+  dropout: 0.1
+  init_from: models/crack_unet16_v1.pt   # the base model handed over in v1
+
+loss:
+  bce_weight: 0.5
+  dice_weight: 0.5
+  pos_weight: 5.0
+
+train:
+  epochs: 60
+  batch_size: 16
+  lr: 0.0003            # lower than from scratch, the weights are already good
+  weight_decay: 0.0001
+  amp: true
+  grad_clip: 1.0
+  early_stop_patience: 20
+  max_train_batches: null
+  max_val_batches: null
+
+eval:
+  thresholds: [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+  tolerance_px: 2

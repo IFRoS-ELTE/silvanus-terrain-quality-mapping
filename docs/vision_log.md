@@ -120,25 +120,67 @@ What the numbers say:
 - Recall (0.78) is lower than precision (0.89): the model misses more than it hallucinates. For the robot that is the safer side (fewer false alarms on tile joints), but check the worst overlays in `eval_test/overlays/` for the kind of cracks that are missed.
 - Not directly comparable with published DeepCrack numbers: papers usually report ODS/OIS F-scores on thinned predictions with their own tolerance. Ours is a pixel metric with a 2 px dilation.
 
+### 2026-10-14: model choice, v1 handoff, plan review
+
+**Runs compared** (all on the GPU server, same data, `unet_public.yaml`; test set 255 images, threshold chosen on validation):
+
+| Run | Params | Best epoch | Threshold | Test Dice | Test IoU | P | R | Tolerant F1 | CPU, 640x480 ONNX |
+|---|---|---|---|---|---|---|---|---|---|
+| unet16, 2026-09-30 (sweep to 0.7) | 1.94M | 146 | 0.7 | 0.833 | 0.713 | 0.893 | 0.780 | 0.909 | 205 ms |
+| **unet16, 2026-10-06 (sweep to 0.9)** | 1.94M | 108 (early stop 138) | 0.8 | **0.833** | **0.714** | 0.908 | 0.770 | **0.912** | **205 ms (4.9 fps)** |
+| unet32, 2026-10-14 | 7.76M | 58 (early stop 88) | 0.7 | 0.831 | 0.711 | 0.891 | 0.779 | 0.913 | 690 ms (1.4 fps) |
+
+CPU timing: laptop, 8 threads, ONNX Runtime. Robot CPU not measured yet.
+
+- The 4x bigger model is not better. The limit is the data (342 training images), not model capacity. **Chosen: unet16 from 2026-10-06**, released as `crack_unet16_v1`.
+- The wider threshold sweep picked 0.8 (old range stopped at 0.7): precision up 1.5 points, recall down 1, tolerant F1 up 0.3. Small gain, but the threshold is no longer at the edge of the sweep.
+- Worst test images are faint hairline cracks on low-contrast concrete (`IMG24-*`, `11247-*`): found in pieces, gaps where the crack fades.
+
+**v1 handoff** (branch `vision-crack-model-handoff`):
+- `vision_training/models/crack_unet16_v1.{pt,onnx,json}`, optimizer state removed from the `.pt` (23 MB to 7.8 MB, CPU tensors). Checksums in `docs/crack_model.md`. Not in git; to be shared as a GitHub release or on the shared drive.
+- `vision_training/deploy/crack_onnx.py`: ONNX Runtime wrapper for the ROS node, numpy + onnxruntime only. Handles BGR input from cv_bridge, normalisation, padding to 16, and an optional robot body mask. A test checks it against PyTorch.
+- `model.init_from` in the training config and `configs/finetune_robot.yaml`: fine-tune from v1 with public + robot frames in training, robot frames only in val/test, lr 3e-4.
+- `robot` dataset converter: `data/raw/robot/<bag>/`, group = bag, frames without a mask are negatives, optional `splits.yaml` to fix bags to splits.
+- `predict.py`: optional colour mask, per-frame `summary.csv` with "crack found" (at least 150 crack pixels). Produces the detection-rate and tile false-alarm table from the milestone list.
+- `docs/crack_model.md`: model card, how to use it in the node, known limits, measure / annotate / fine-tune steps.
+
+**Facts from the robot branch (`praveen-robot-and-depth`) that change the vision plan:**
+- Robot colour stream is 640x480 at 30 Hz (`/camera/camera/color/image_raw`), depth 848x480. Topic prefix is `/camera/camera/`.
+- The depth hazard node already exists (`ground_demo/ground_hazard_node.py`), tested against tape-measured objects (mean error 1.7 mm). The depth node item is removed from this list.
+- The gripper/body mask exists for **depth only** (848x480, 28 % of the frame). It cannot be resized for colour because the two sensors have different fields of view. A colour mask still has to be drawn.
+- The bags have no aligned depth topic. Placing crack pixels in 3D needs the colour and depth `camera_info` plus the colour-to-depth transform from `/tf_static`.
+- Camera unevenness (depth) and the IMU 8-50 Hz / 0.5-8 Hz band ratio already separate smooth from rough surfaces (asphalt vs grass 97 % from the camera, 91 % from the IMU). The RGB terrain classifier only has to say what the surface **is**, not how bumpy it is.
+
+**Plan review: HrSegNet** ([repo](https://github.com/CHDyshli/HrSegNet4CrackSegmentation), [paper](https://arxiv.org/abs/2307.00270), Automation in Construction 2023). Decision: **keep our U-Net as the base, do not switch now.**
+- It is PaddlePaddle / PaddleSeg, not PyTorch. Fine-tuning it on our frames means a second training framework; deployment needs Paddle2ONNX or their TensorRT engines (built for TensorRT 8.6 on a GPU; the robot has no known GPU).
+- Its reported numbers (78-80 % mIoU on CrackSeg9k) are mean IoU over two classes, background and crack. Background IoU is close to 99 %, so the crack IoU behind it is roughly 57-61 %. Our 0.71 is crack-only IoU on different test data. The numbers cannot be compared directly, and neither says anything about our robot frames.
+- What it does have that we do not: training on CrackSeg9k (about 9,000 images merged from 10 datasets). That is the useful part. If v1 struggles on our frames even after fine-tuning, the next step is to train our U-Net on CrackSeg9k (Harvard Dataverse; a later paper reports matching problems in the upload, so check counts), not to switch frameworks.
+- Fair comparison if needed later: run their released CrackSeg9k weights and our v1 on the same annotated robot test bag.
+
+**Plan review: terrain.** Agreed with the team idea, with two corrections:
+- Terrain does **not** go into the crack model. It is a separate small classifier (different output: one label per region, not a pixel mask). Combining them in one network would make both harder to train and to debug.
+- "Plain vs bumpy" does **not** come from RGB. Depth unevenness and the IMU band ratio already measure it. RGB adds the surface type (asphalt, red rubber path, wood chips, grass/dirt, tile), which is what lets us say "grass, rough" vs "asphalt, smooth" and compare vision-only, IMU-only and combined classification (evaluation plan).
+- First version trains on our own labelled outdoor runs (5 bags, labels in `docs/DATA.md`), not on an online dataset: our surfaces, our camera, our tilt. ImageNet-pretrained small CNN (MobileNetV3-small or ResNet18) on ground-region crops, split by bag (test on a run it never saw). Public terrain datasets (GTOS-mobile, RUGD) only if our data is too small.
+
 ## 4. Next steps
 
-Vision training:
-1. ~~Real training run on the GPU server~~ Done, see the baseline entry above. Still to do: rerun with the wider threshold sweep, look at the worst overlays, export ONNX and time it on CPU.
-2. Download Crack500 by hand, check the layout, rerun `prepare_data.py`, retrain. Crack500 is phone photos of pavement, the closest public match to the robot view.
-3. Compare base_channels 16 vs 32 (accuracy vs CPU fps on the robot).
-4. Run `predict.py` on spare D435 frames of campus pavement and corridor floors. Collect false positives (tile joints, painted lines, shadows, drains) as hard negatives.
-5. Annotate about 120 crack frames and 150 negatives from our own data (CVAT or Label Studio, class `crack`), add an `own` converter grouped by session, fine tune.
-6. RGB terrain classifier on patches (grass, asphalt, gravel, tiles). Same package structure; will need patch labels from the terrain segments labelled in the bags on the IMU side.
+Crack model:
+1. Share the v1 files (GitHub release `crack-model-v1` or the shared drive) and point Aritra to `docs/crack_model.md`.
+2. Draw the colour robot mask (640x480) on one frame.
+3. Measure v1 on our frames (`docs/crack_model.md` section 4): detection rate on cracked asphalt (`1618` 0-36 s, `1548` 57-72 s), false alarms on indoor tile. Push overlays and the two numbers.
+4. Annotate (about 120 crack frames, 150 negatives), fine-tune with `finetune_robot.yaml`, export v2. Test bag: `garden_surfaces_1548` + `corridor_groundtruth_1447`.
+5. Only if v2 is still weak: CrackSeg9k pretraining, Crack500, or an HrSegNet comparison on the robot test bag.
 
-Rest of the vision work (not started):
-7. Spare D435 experiments (handover section 9.4): height 0.4 to 0.9 m, tilt 30 to 60 degrees, walking 0.3 / 0.6 / 1.0 m/s, depth 848x480 at 30 fps, colour 1280x720, align on, fixed exposure. Output: plane fit noise vs distance and speed, recommended arm pose for the robot side of the team.
-8. `terrain_vision` ROS 2 package: depth hazard node (RANSAC plane, residual clusters, sizes, unevenness), crack node using the exported ONNX and its JSON, mock publisher for `/ground/*` topics so the IMU/fusion and robot-control sides can test their subscribers.
+Terrain:
+6. RGB terrain classifier v1: frames from the 5 outdoor bags at the labelled time ranges (2 s margin at each boundary), ground-region crops below the horizon and outside the robot mask, classes asphalt / red path / wood chips / grass-dirt (+ tile from indoor bags). Pretrained small CNN, split by bag, accuracy per surface on an unseen run. Publishes `{"label", "confidence"}` on `/ground/rgb_terrain`.
+
+Dropped: the spare D435 home experiments (real robot bags exist and the arm pose is chosen, `docs/robot/arm_pose.md`), and our own depth hazard node (exists on the robot branch).
 
 ## 5. Open questions
 
-- Does the robot computer have a GPU? Decides base_channels and whether the crack node runs on the robot or a laptop.
-- Is aligned depth (`/camera/aligned_depth_to_color/image_raw`) published? Needed to put crack pixels in 3D.
-- Where exactly the gripper appears in the image at the chosen arm pose (fixed mask).
+- Does the robot computer have a GPU? Decides whether the crack node runs on the robot CPU (about 5 fps measured on a laptop) or on a laptop on the robot network.
+- No aligned depth in the bags. Either ask for `align_depth` in the lab bring-up or project colour pixels to depth ourselves (both `camera_info` + `/tf_static`).
+- Who owns annotation and the base-model measurement on robot frames: the milestone list puts them under vision, the team discussion under the crack node. Agree once.
 - Licences of the public datasets for a public repo: we do not redistribute them, the scripts download them from the original source. Cite them in the report (citations are in `src/crackseg/data/sources.py`).
 
 ## 6. How to resume from scratch
