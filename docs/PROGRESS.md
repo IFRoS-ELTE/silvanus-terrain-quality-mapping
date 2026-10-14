@@ -49,13 +49,16 @@ it is fully in view (slow run):
 
 Tested against objects measured with a tape, 24 passes over 3 runs:
 
-| object | true height | measured |
-|---|---|---|
-| foam block | 50 mm | 47 |
-| book | 30 mm | 26-27 |
-| foam strip | 20 mm | 19-21 |
-| long wooden plank | 20 mm | 18-20 |
-| wooden block | 15 mm | 15-19 |
+| object | tape size, L x W x H | true height | measured height |
+|---|---|---|---|
+| foam block | 25.5 x 20.5 x 5 cm | 50 mm | 47 mm |
+| book | 20 x 14 x 3 cm | 30 mm | 26-27 mm |
+| foam strip | 94-96 x 20 x 2 cm | 20 mm | 19-21 mm |
+| long wooden plank | 111 x 8.2 x 2 cm | 20 mm | 18-20 mm |
+| wooden block | 31.5 x 6.5 x 1.5 cm | 15 mm | 15-19 mm |
+
+Sizes were measured with a tape in cm; heights are compared in mm (1 cm = 10 mm)
+because the errors are a few mm.
 
 **Mean error 1.7 mm, worst 4.3 mm.** Before the fix in this update it was 4.1 mm
 and 9.9 mm: thin objects read high because only the pixels above the 15 mm
