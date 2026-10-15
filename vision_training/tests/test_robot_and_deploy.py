@@ -43,6 +43,23 @@ def test_robot_frames_grouped_by_bag_and_unmasked_frames_are_negatives(tmp_path)
     assert {s.split for s in samples if s.group == "corridor_1338"} == {"test"}
 
 
+def test_robot_mask_finds_the_static_gripper_only():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from make_robot_mask import robot_mask_from_frames
+
+    rng = np.random.default_rng(0)
+    frames = rng.uniform(0, 255, (40, 120, 160)).astype(np.float32)  # changing ground
+    frames[:, 100:, 60:100] = 30           # gripper: fixed, dark, touches the bottom
+    frames[:, 20:30, 20:30] = 200          # a static patch in the middle, e.g. a stain on the lens
+
+    robot = robot_mask_from_frames(frames, margin_px=2, min_area=20)
+    assert robot[110, 80]                  # gripper masked
+    assert robot[98, 80]                   # margin added above it
+    assert not robot[25, 25]               # middle patch not touching the bottom is kept as ground
+    assert not robot[60, 10]               # ordinary ground kept
+    assert robot.mean() < 0.15
+
+
 def test_onnx_wrapper_matches_pytorch(tmp_path):
     pytest.importorskip("onnxruntime")
     sys.path.insert(0, str(DEPLOY_DIR))
