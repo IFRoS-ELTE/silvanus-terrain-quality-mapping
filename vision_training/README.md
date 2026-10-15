@@ -11,7 +11,7 @@ cd vision_training
 python -m venv .venv
 source .venv/bin/activate          # Windows PowerShell: .venv\Scripts\Activate.ps1
 pip install -e ".[onnx,dev]"
-python -m pytest                   # 14 tests, about 10 seconds
+python -m pytest                   # 16 tests, about 20 seconds
 ```
 
 On the GPU server, install the CUDA build of PyTorch first (see the comment at the top of `requirements.txt`), then the same `pip install -e ".[onnx,dev]"`.
@@ -37,9 +37,14 @@ python scripts/evaluate.py --checkpoint runs/<run>/best.pt
 # 5. ONNX for the robot, plus a JSON with threshold and normalisation
 python scripts/export_onnx.py --checkpoint runs/<run>/best.pt
 
-# 6. Try the model on our own unlabelled frames
-python scripts/predict.py --checkpoint runs/<run>/best.pt --images path/to/frames
+# 6. Try the model on our own unlabelled frames (per-frame summary.csv, optional robot mask)
+python scripts/predict.py --checkpoint runs/<run>/best.pt --images path/to/frames --mask colour_mask.png
+
+# 7. Fine-tune the released model on annotated robot frames in data/raw/robot/
+python scripts/train.py --config configs/finetune_robot.yaml
 ```
+
+The released model, how the ROS node uses it, and the annotation and fine-tuning steps are in [docs/crack_model.md](../docs/crack_model.md).
 
 ## Code layout
 
@@ -58,10 +63,12 @@ src/crackseg/
   engine.py            train and eval loops
   inference.py         full image prediction with padding, checkpoint loading
   utils.py             config, seeding, device, logging
+deploy/crack_onnx.py   ONNX Runtime wrapper for the ROS node, numpy + onnxruntime only
+models/                released model files (downloaded, not in git)
 tests/                 pytest, no dataset download needed
 data/, runs/           created by the scripts, ignored by git
 ```
 
 ## Adding our own annotated frames
 
-Export the annotations as `name.jpg` plus `name_mask.png` (crack = any non-zero value) into `data/raw/own/<session>/`. Then add a converter in `data/converters.py` that calls `convert_mask_suffix_folders` and sets `group` to the recording session, and register it in `CONVERTERS`. Splitting by group keeps frames from one drive in one split. See `docs/vision_log.md` for why that matters.
+Put frames in `data/raw/robot/<bag name>/`, each crack frame with a `<frame>_mask.png` next to it (frames without a mask count as negatives), and optionally a `data/raw/robot/splits.yaml` that assigns each bag to train, val or test. `prepare_data.py` picks the folder up automatically. All frames of one bag stay in one split; see `docs/crack_model.md` section 5.

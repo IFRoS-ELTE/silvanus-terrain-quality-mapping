@@ -158,8 +158,58 @@ def convert_crack500(raw_dir: Path, out_root: Path) -> list[Sample]:
     )
 
 
+def convert_robot(raw_dir: Path, out_root: Path) -> list[Sample]:
+    """Frames from our own rosbags, one folder per bag.
+
+        data/raw/robot/<bag name>/<frame>.png          frame from tools/bag_to_images.py
+        data/raw/robot/<bag name>/<frame>_mask.png     crack mask, white = crack
+        data/raw/robot/splits.yaml                     optional, bag name -> train/val/test
+
+    A frame without a mask file counts as a negative (no crack). That is on
+    purpose: most frames we keep from the indoor bags are tile floor with
+    grout lines, and drawing empty masks for all of them is busywork. The
+    count of negatives per bag is logged, so a forgotten mask shows up as an
+    unexpected number.
+
+    The group is the bag name, so every frame of one drive lands in the same
+    split. With only a handful of bags a random split is too coarse, which is
+    why splits.yaml can fix the split per bag. Without it, splits.py
+    assigns bags at random.
+    """
+    fixed_splits = {}
+    split_file = raw_dir / "splits.yaml"
+    if split_file.exists():
+        import yaml
+        fixed_splits = yaml.safe_load(split_file.read_text()) or {}
+
+    samples = []
+    for bag_dir in sorted(p for p in raw_dir.iterdir() if p.is_dir()):
+        bag = bag_dir.name
+        positives = negatives = 0
+        for img_path in sorted(bag_dir.iterdir()):
+            if img_path.suffix.lower() not in IMAGE_EXTS or img_path.stem.endswith("_mask"):
+                continue
+            mask_path = bag_dir / f"{img_path.stem}_mask.png"
+            if mask_path.exists():
+                mask = _binary_mask(np.array(Image.open(mask_path).convert("L")))
+                positives += 1
+            else:
+                with Image.open(img_path) as im:
+                    mask = np.zeros((im.height, im.width), np.uint8)
+                negatives += 1
+            if not _check_same_size(img_path, mask):
+                continue
+            sid = f"robot_{img_path.stem}"
+            img_rel, mask_rel = _save_pair(img_path, mask, out_root, "robot", sid)
+            samples.append(Sample(sid, "robot", img_rel, mask_rel, fixed_splits.get(bag), bag))
+        log.info("robot/%s: %d frames with a mask, %d without (negatives), split %s",
+                 bag, positives, negatives, fixed_splits.get(bag, "random"))
+    return samples
+
+
 CONVERTERS: dict[str, Callable[[Path, Path], list[Sample]]] = {
     "deepcrack": convert_deepcrack,
     "crackforest": convert_crackforest,
     "crack500": convert_crack500,
+    "robot": convert_robot,
 }
