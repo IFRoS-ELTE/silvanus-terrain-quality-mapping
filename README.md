@@ -1,55 +1,200 @@
-# silvanus-terrain-quality-mapping
+# Terrain quality and hazard mapping with Silvanus
 
-Terrain quality and hazard mapping with the Silvanus robot (AgileX Scout 2.0 with a RealSense D435 and an Xsens IMU). IFRoS Robotics Lab, ELTE, autumn 2026.
+IFRoS Robotics Lab, ELTE, autumn 2026. Muhammad Yamin, Praveen Kumar Murali, Aritra Das.
 
-The robot is driven along a route. The camera looks at the ground ahead and predicts what is coming (holes, bumps, unevenness, cracks, terrain type). The IMU measures what the robot actually felt when it drove over it. Everything is stamped with position and speed and stored on a map, and the robot slows down or stops before hazards. In short: the camera predicts, the IMU confirms.
+Silvanus (an AgileX Scout 2.0 with an xArm6) drives over indoor floors and outdoor paths. A RealSense D435 on the arm wrist looks at the ground about a metre ahead and measures holes, bumps, cracks and how uneven the surface is. An Xsens IMU on the chassis measures what the wheels actually felt when the robot drove over the same spot. Both are stamped with position and speed so they can go on a map, and the robot will slow down before hazards.
 
-## Simulation
-
-Silvanus in Gazebo with the arm posed so the wrist camera looks at the ground, driving towards a patch of cracked pavement:
+The short version: **the camera predicts, the IMU confirms.**
 
 <p align="center">
-  <img src="docs/images/sim_gazebo_world.jpeg" width="80%" alt="Silvanus in the Gazebo world in front of a cracked pavement patch">
+  <img src="docs/media/robot_left_side.jpg" width="70%" alt="Silvanus in the lab">
 </p>
 
-The camera stream in RViz with the first crack detection node running on it. Each green box is a crack candidate, published as JSON on `/crack_detection/detections` and drawn on `/crack_detection/debug_image`:
+*Last updated 15 October 2026, week 3 of 8. Final presentation at the end of November.*
+
+---
+
+## Progress at a glance
+
+| Week | Goal | Status |
+|---|---|---|
+| 1 (1-7 Oct) | Depth hazard node running on the robot | Done, checked live and on bags |
+| 1 | IMU mounting measured, transform published | Done, IMU raised from 10 to 100 Hz |
+| 1 | First outdoor recordings with a surface log | Done, 5 outdoor runs with labelled surfaces |
+| 1 | Robot body and gripper mask | Done for depth; colour mask in progress |
+| 2 (8-14 Oct) | Outdoor localization tested | Done offline, wheel speed + IMU heading works best |
+| 2 | Crack model trained and released for the robot | Done, model v1 handed to the crack node |
+| 2 | Indoor map with SLAM | Blocked: the lidar scan contains the floor (section 5) |
+| 2 | IMU roughness | The feature that separates surfaces is found; node not written yet |
+| 2 | RGB terrain classifier, annotation of our own frames | Started |
+| 3 (15-21 Oct) | Zigzag coverage sweep | Tool written; the simulator's skid steer turns too slowly to follow it yet |
+
+Full plan to the end of November: [docs/MILESTONES.md](docs/MILESTONES.md).
+
+---
+
+## 1. Hazards from the depth camera
+
+Every depth frame gets a ground plane fitted with RANSAC. Each point then has a height above or below that plane. Points far enough above it are bumps, points below it are holes, and each one is measured: length, width and height.
 
 <p align="center">
-  <img src="docs/images/sim_crack_boxes_1.jpeg" width="32%" alt="Crack candidates in the camera view, frame 1">
-  <img src="docs/images/sim_crack_boxes_2.jpeg" width="32%" alt="Crack candidates in the camera view, frame 2">
-  <img src="docs/images/sim_crack_boxes_3.jpeg" width="32%" alt="Crack candidates in the camera view, frame 3">
+  <img src="docs/media/crossing_detection.gif" width="85%" alt="Depth hazard detection while driving over test objects">
 </p>
 
-The lower half of the view is the robot's own front bumper and wheels, and some boxes land there. A fixed mask for the robot body (and later the gripper on the real arm) is one of the next steps, and the learned segmentation model below replaces the dark-pixel threshold.
+Left: the robot camera. Right: the height of every point above the fitted floor, red up and blue down. The green boxes are detections, labelled with the measured height and the height from a tape measure. Full 37 s clip: [crossing_detection.mp4](docs/media/crossing_detection.mp4).
 
-## Where things stand
+We placed five objects on the corridor floor, measured each with a tape, and drove over them 24 times across 3 runs:
 
-**Progress against the milestones, with results, figures and video: [docs/PROGRESS.md](docs/PROGRESS.md).**
+| Object | Tape size (L x W x H) | True height | Camera |
+|---|---|---|---|
+| Foam block | 25.5 x 20.5 x 5 cm | 50 mm | 47 mm |
+| Book | 20 x 14 x 3 cm | 30 mm | 26-27 mm |
+| Foam strip | 94-96 x 20 x 2 cm | 20 mm | 19-21 mm |
+| Long wooden plank | 111 x 8.2 x 2 cm | 20 mm | 18-20 mm |
+| Wooden block | 31.5 x 6.5 x 1.5 cm | 15 mm | 15-19 mm |
+
+The mean error is 1.7 mm and the worst is 4.3 mm. The same object measures the same within 1-2 mm on every pass and at both speeds. The gripper sits at the bottom of every depth frame, so it is masked out; that removed the false bumps it used to cause.
+
+<details>
+<summary>Each object on a typical frame (click to open)</summary>
+<p align="center">
+  <img src="docs/media/detection_objects.jpg" width="60%" alt="Each test object with its measured and true height">
+</p>
+</details>
+
+Code: [ground_demo/](ground_demo/README.md). Details and the history of the fixes: [ground_demo/BRANCH_NOTES.md](ground_demo/BRANCH_NOTES.md).
+
+## 2. The camera predicts, the IMU confirms
 
 <p align="center">
-  <img src="docs/media/crossing_detection.gif" width="80%" alt="Depth hazard detection on the robot: camera view and height above the floor with detected objects">
+  <img src="docs/media/groundtruth_1447_camera_vs_imu.png" width="90%" alt="What the camera saw and what the IMU felt on the ground-truth run">
 </p>
 
-**Depth hazard detection** (`ground_demo/`). A ROS 2 node that fits the ground plane in every depth frame and reports bumps and holes with their size. Against tape-measured objects from 15 to 50 mm the height is within 1.7 mm on average. The IMU on the robot is now calibrated and runs at 100 Hz, and confirms a 50 mm hazard when the wheels cross it. Recorded data and surface labels: [docs/DATA.md](docs/DATA.md).
+The camera sees each object about 4 seconds before the wheels reach it. From where it saw the object and the odometry, we can predict when the front wheels and then the rear wheels will hit it (shaded bands). On the 50 mm foam block the IMU shows the two largest jolts of the run exactly in those bands. That is the first confirmed hazard.
 
-**Crack segmentation model** (`vision_training/`). A complete offline pipeline in PyTorch: it downloads the public DeepCrack and CrackForest datasets, splits them so crops of the same photo never land in both train and test, trains a small U-Net, evaluates it, and exports it to ONNX for CPU inference on the robot. Model v1 (1.9M parameters) reaches Dice 0.83 on the public test set and runs at about 5 fps on 640x480 frames on a laptop CPU. It is released for the crack node and will be fine-tuned on frames from our own bags: [docs/crack_model.md](docs/crack_model.md).
+What else the crossing runs showed:
 
-**ROS 2 crack detection node and robot container** (`src/crack_detection/`, `Dockerfile`). A ROS 2 Jazzy node that publishes crack boxes and a debug image from the colour camera; the screenshots above are its first, threshold-based version, which the U-Net replaces. The Dockerfile builds on `ros:jazzy-ros-base`, the same base as the lab's robot image, so the container runs next to the robot's hardware stack.
+- At 0.2-0.3 m/s the IMU feels rigid objects from 15 mm (the wooden blocks).
+- It never feels the 20 mm foam, because foam squashes under the tyre. This is a result: some hazards the camera sees are harmless for this robot.
+- Above about 0.4 m/s the robot's own shaking on tile hides every object. The IMU can only confirm a hazard if the robot slows down near it, which is what the speed governor is for.
 
-**Next.** The U-Net in the crack node with a colour mask for the gripper, our own annotated frames for fine-tuning, cracks placed in 3D, an RGB terrain classifier for the surface type, the IMU roughness node, and indoor SLAM once the lidar scan is fixed.
+## 3. Outdoor surfaces
 
-## Quick start
+<p align="center">
+  <img src="docs/media/outdoor_surfaces.jpg" width="95%" alt="Five outdoor surfaces from the robot camera, with the height map below each">
+</p>
 
-Crack segmentation training (plain Python, no ROS needed):
+Top: the robot camera. Middle: height above the fitted ground on the same frame. The numbers are medians over all runs.
+
+| Surface | Camera unevenness | IMU fast/slow shaking |
+|---|---|---|
+| Asphalt (plain and cracked) | 3.9 mm | 2.2 |
+| Red rubber path | 3.6 mm | 0.51 |
+| Wood chips | 7.5 mm | 0.41 |
+| Grass / dirt | 6.8 mm | 0.29 |
+
+Camera unevenness is the RMS height of the ground points around the fitted plane. The indoor tile floor reads 3.4-3.7 mm, which is the depth camera's own noise, so asphalt and the red path are as flat as the camera can tell, while grass and wood chips are clearly rougher. Depth works in daylight: 96 % of pixels are valid and the ground plane is found in every frame.
+
+The planned IMU roughness number, the RMS of vertical acceleration, did **not** separate surfaces: on all of them it is about 1.0 times the speed. What does separate them is which frequencies shake. We take the power at 8-50 Hz divided by the power at 0.5-8 Hz, at matched speed. Hard asphalt shakes fast, soft ground shakes slow. This only works with the IMU at 100 Hz. With one threshold, asphalt vs grass is 97 % correct from the camera and 91 % from the IMU.
+
+One whole outdoor run, the driven path and both roughness numbers along it. Both change when the surface changes:
+
+<p align="center">
+  <img src="docs/media/outdoor_run_1628.png" width="95%" alt="Outdoor run 1628: path, camera unevenness and IMU shaking per surface">
+</p>
+
+Videos: [the run with detections and height map](docs/media/outdoor_run_1628.mp4) (90 s), [the robot outdoors from a phone](docs/media/robot_outdoor_1618.mp4).
+
+On grass and wood chips the fixed 15 mm bump threshold also boxes tufts and leaves as 12-19 mm bumps. Off pavement, the threshold has to follow the unevenness of the surface.
+
+## 4. Cracks
+
+Depth cannot see thin cracks (the D435 noise is a few millimetres), so cracks come from the colour image with a segmentation network.
+
+We trained a small U-Net (1.9 million parameters) on two public crack datasets, DeepCrack and CrackForest. Crops of the same photo never end up in both training and test; in DeepCrack they did at first, and fixing that dropped the validation score from 0.81 to 0.57 on a quick test run, so the original number was inflated.
+
+| | Dice | IoU | Precision | Recall | F1 with 2 px tolerance |
+|---|---|---|---|---|---|
+| Public test set, 255 images | 0.833 | 0.714 | 0.908 | 0.770 | 0.912 |
+
+A model four times larger scored the same and ran three times slower, so we kept the small one. On a laptop CPU it takes about 0.2 s per 640x480 frame, which is enough: the camera sees each spot for several seconds before the robot reaches it.
+
+The first crack node ran in simulation with a simple dark-pixel threshold:
+
+<p align="center">
+  <img src="docs/images/sim_gazebo_world.jpeg" width="40%" alt="Silvanus in Gazebo in front of cracked pavement">
+  <img src="docs/images/sim_crack_boxes_1.jpeg" width="49%" alt="Crack boxes from the threshold node in RViz">
+</p>
+
+The threshold also boxes the robot's own bumper and wheels, which is why the U-Net and a robot mask replace it. Now in progress: running the U-Net on the cracked asphalt from our outdoor runs, a colour mask for the gripper, and fine-tuning on our own annotated frames. Model card and steps: [docs/crack_model.md](docs/crack_model.md). Training code: [vision_training/](vision_training/README.md).
+
+## 5. Where the robot is: localization
+
+| Option | Result |
+|---|---|
+| GNSS | A fix in 3 of 5 runs, about ±7-10 m. Too coarse for hazard positions |
+| Wheel odometry | Misjudges turns by 15-30° per run (skid steer) |
+| **Wheel speed + IMU heading** | **Best so far.** A 26 m indoor out-and-back ends 0.70 m from the start (wheels alone: 4.74 m). A 35 m outdoor loop ends 0.37 m from the start (wheels: 0.97 m) |
+| Lidar SLAM (lab config) | Fails indoors and outdoors with the current scan, see below |
+
+<p align="center">
+  <img src="docs/media/heading_wheels_vs_imu.png" width="70%" alt="Path from wheels alone vs wheel speed with IMU heading">
+</p>
+
+Same wheel speeds in both paths, only the heading differs. The figure is the offline comparison; the same fusion runs in ROS with `robot_localization` ([config/ekf_odom_imu.yaml](config/ekf_odom_imu.yaml)). To run it live, the base driver must stop publishing its own odometry transform, which the lab launch does not allow yet.
+
+**Why SLAM fails.** The 2D scan is cut from the 3D lidar using all points between -0.10 and +0.60 m above the floor, so it includes the floor itself. The lowest beam hits the floor 1.4 m away, and indoors 80 % of the scan becomes a ring of floor around the robot. The ring moves with the robot and looks the same everywhere, so SLAM decides the robot is not moving.
+
+<p align="center">
+  <img src="docs/media/slam_maps.png" width="95%" alt="SLAM maps against wheel odometry, indoors and outdoors">
+</p>
+
+The fix is to raise the scan's minimum height to about +0.10 m indoors (+0.15 m outdoors) in the lab bring-up, and to record the 3D lidar so scans can be remade offline.
+
+## 6. Known problems
+
+| Problem | Effect | Next step |
+|---|---|---|
+| The 2D scan contains the floor | SLAM and Nav2 unusable | Change `min_height` in the lab bring-up |
+| Fixed depth threshold outdoors | Tufts and leaves boxed as 12-19 mm bumps | Threshold that follows the surface's unevenness |
+| D435 drops off USB | Happened 5 times on 8 October, after fast or rough driving | Secure the cable; reported to the lab |
+| Wheel odometry heading | 15-30° error per run | Fuse the IMU heading (EKF, ready) |
+| GNSS | ±7-10 m, no fix in 2 of 5 runs | Rough placement only |
+
+## 7. Next weeks
+
+- **Week 3.** Fix the scan and build the indoor map; EKF live on the robot; IMU roughness node with the frequency-band feature; crack model on our outdoor runs; RGB terrain classifier v1 on the five labelled surfaces.
+- **Week 4.** More labelled outdoor runs (pavement, grass, gravel, dirt, slope) with repeats; map layer with the path coloured by roughness and hazard markers.
+- **Week 5.** Everything together, first on one bag and then live: the robot approaches a book, slows down by itself, crosses it, the IMU spike is logged and a confirmed marker appears on the map.
+- **Weeks 6-8.** Repeat runs, roughness vs speed, the camera unevenness vs IMU roughness comparison, hazard counts per class, the smallest hazard the robot feels, demo video and presentation.
+
+Every hazard will end up in one of three classes, which is the main result of the project:
+
+| Class | Camera saw it | IMU felt it | Meaning |
+|---|---|---|---|
+| A | yes | no | Seen, not felt: the wheels missed it, or it is too small for this robot |
+| B | no | yes | Felt, not seen: the camera missed it |
+| C | yes | yes | Confirmed |
+
+---
+
+## For the team
+
+| Document | What is in it |
+|---|---|
+| [docs/PROGRESS.md](docs/PROGRESS.md) | Detailed results, robot side |
+| [docs/DATA.md](docs/DATA.md) | Every recorded bag, surface labels, how to replay them (bags are on the shared drive) |
+| [docs/schema.md](docs/schema.md) | Topic names and message formats |
+| [docs/crack_model.md](docs/crack_model.md) | Crack model: files, how to use it in the node, annotation and fine-tuning |
+| [docs/vision_log.md](docs/vision_log.md) | Vision decisions and results, step by step |
+| [docs/robot/](docs/robot/) | Arm pose, IMU mount, how to run a robot session |
+| [tools/analysis/](tools/analysis/README.md) | Scripts that make every figure on this page |
+
+ROS 2 packages target ROS 2 Jazzy on Ubuntu 24.04 in Docker (`ros:jazzy-ros-base`, the same base as the lab's robot image). The crack training code in `vision_training/` is plain Python and PyTorch:
 
 ```bash
 cd vision_training
 pip install -e ".[onnx,dev]"
-python scripts/download_data.py
-python scripts/prepare_data.py
+python scripts/download_data.py && python scripts/prepare_data.py
 python scripts/train.py --config configs/smoke_cpu.yaml
 ```
-
-See [vision_training/README.md](vision_training/README.md) for the full workflow, and [docs/vision_log.md](docs/vision_log.md) for decisions, results and open items on the vision side.
-
-ROS packages target ROS 2 Jazzy on Ubuntu 24.04 inside Docker.
