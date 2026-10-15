@@ -11,7 +11,7 @@ cd vision_training
 python -m venv .venv
 source .venv/bin/activate          # Windows PowerShell: .venv\Scripts\Activate.ps1
 pip install -e ".[onnx,dev]"
-python -m pytest                   # 16 tests, about 20 seconds
+python -m pytest                   # 17 tests, about 30 seconds
 ```
 
 On the GPU server, install the CUDA build of PyTorch first (see the comment at the top of `requirements.txt`), then the same `pip install -e ".[onnx,dev]"`.
@@ -39,6 +39,9 @@ python scripts/export_onnx.py --checkpoint runs/<run>/best.pt
 
 # 6. Try the model on our own unlabelled frames (per-frame summary.csv, optional robot mask)
 python scripts/predict.py --checkpoint runs/<run>/best.pt --images path/to/frames --mask colour_mask.png
+
+# 6b. Colour mask for the gripper and robot body, from frames of several bags
+python scripts/make_robot_mask.py --frames ../frames/bag_a ../frames/bag_b ../frames/bag_c --out models/robot_mask_color.png
 
 # 7. Fine-tune the released model on annotated robot frames in data/raw/robot/
 python scripts/train.py --config configs/finetune_robot.yaml
