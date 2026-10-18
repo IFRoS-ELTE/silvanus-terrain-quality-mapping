@@ -101,6 +101,10 @@ class GroundHazardNode(Node):
         # robot can drive over is a third of a metre deep, so cap it rather
         # than publish a marker the size of the room.
         self.declare_parameter("max_size_mm", 300.0)
+        # When less than this share of the points lies on the plane, the ground
+        # is not one flat surface (wood chips: 42 % of frames) and the residual
+        # turns into half-image "holes". Skip the hazards, keep the unevenness.
+        self.declare_parameter("min_inliers", 0.5)
         # The D435 is fixed to the gripper, so the gripper blocks the same pixels
         # in every arm pose. The edge of that region produces flying pixels that
         # were read as ~100 mm bumps and false holes. Empty string disables it.
@@ -117,6 +121,7 @@ class GroundHazardNode(Node):
         self.zmin = float(g("zmin_m"))
         self.zmax = float(g("zmax_m"))
         self.max_size_mm = float(g("max_size_mm"))
+        self.min_inliers = float(g("min_inliers"))
         self.every_n = max(1, int(g("process_every_n")))
         self.publish_cloud = bool(g("publish_cloud"))
         self.cloud_stride = max(1, int(g("cloud_stride")))
@@ -231,9 +236,13 @@ class GroundHazardNode(Node):
                          if flat.any() else 0.0)
         self.pub_un.publish(Float32(data=unevenness_mm))
 
-        hazards = find_hazards(cloud, valid, resid, nrm, d,
-                               self.threshold_m, self.min_area_cm2, fx, fy)
-        hazards = [h for h in hazards if h["peak_mm"] <= self.max_size_mm]
+        if inlier_frac < self.min_inliers:
+            hazards = []
+        else:
+            hazards = find_hazards(cloud, valid, resid, nrm, d,
+                                   self.threshold_m, self.min_area_cm2, fx, fy,
+                                   max_height=self.max_size_mm / 1000.0)
+            hazards = [h for h in hazards if h["peak_mm"] <= self.max_size_mm]
 
         self.publish_detections(hazards, nrm, inlier_frac, header)
         self.publish_markers(hazards, nrm, header)

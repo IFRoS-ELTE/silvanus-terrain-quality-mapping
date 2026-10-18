@@ -158,7 +158,7 @@ def plane_basis(nrm):
 
 
 def find_hazards(cloud, valid, resid, nrm, d, thresh, min_area_cm2, fx, fy,
-                 grow_frac=0.5):
+                 grow_frac=0.5, max_height=None):
     """Cluster the points that stand off the plane into holes and bumps.
 
     A hazard is detected where the residual passes `thresh`, but its height is
@@ -167,6 +167,13 @@ def find_hazards(cloud, valid, resid, nrm, d, thresh, min_area_cm2, fx, fy,
     objects high: a 15 mm board came out at 22 mm, a 20 mm strip at 24 mm.
     Over the grown outline the median is within a few mm on every tape-measured
     object (docs/DATA.md, BRANCH_NOTES.md).
+
+    With `max_height` (m), anything taller, such as a wall or a door frame, is
+    cut out with a small margin before the clustering. Otherwise a low hazard
+    touching it, like a door threshold, joins the tall object and is thrown
+    away with it. The lower face of the tall object that is left over is
+    nearly vertical, so it covers almost no area on the plane and fails
+    `min_area_cm2`.
     """
     fwd, right = plane_basis(nrm)
     origin_on_plane = -d * nrm          # the camera's own footprint on the plane
@@ -174,12 +181,19 @@ def find_hazards(cloud, valid, resid, nrm, d, thresh, min_area_cm2, fx, fy,
 
     for kind, sgn in (("bump", 1.0), ("hole", -1.0)):
         sel = (sgn * resid > thresh) & valid
+        if max_height is not None:
+            tall = ((sgn * resid > max_height) & valid).astype(np.uint8)
+            tall = cv2.dilate(tall, np.ones((9, 9), np.uint8)).astype(bool)
+            sel &= ~tall
+            valid_here = valid & ~tall
+        else:
+            valid_here = valid
         m = sel.astype(np.uint8)
         if not m.any():
             continue
         m = cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
         n_lab, lab, stats, _ = cv2.connectedComponentsWithStats(m, connectivity=8)
-        low = ((sgn * resid > grow_frac * thresh) & valid).astype(np.uint8)
+        low = ((sgn * resid > grow_frac * thresh) & valid_here).astype(np.uint8)
         _, lab_low = cv2.connectedComponents(low, connectivity=8)
         for i in range(1, n_lab):
             if stats[i, cv2.CC_STAT_AREA] < 40:
