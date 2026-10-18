@@ -91,9 +91,12 @@ When cracks are projected to 3D later, they go into `hazards.json` with type
 
 ### `/terrain/imu_roughness`
 
-RMS of vertical acceleration with gravity removed, over a 1 s window, in
-m/s². Published at 5 Hz. Indoor tile was about 0.23 and garden about 0.39 in
-the first bags.
+Power of the vertical free acceleration (`/filter/free_acceleration`, gravity
+already removed) at 8-50 Hz divided by the power at 0.5-8 Hz, over the last
+1.8 s (180 samples at 100 Hz). No unit. Published at 4 Hz, and only meaningful
+at 0.25-0.50 m/s. Medians over the 2026-10-08 runs: asphalt 2.2, red rubber
+path 0.51, wood chips 0.41, grass/dirt 0.29. The RMS planned at first only
+follows the speed (about 1.0 x speed on every surface), see docs/PROGRESS.md.
 
 ### `/ground/rgb_terrain` and `/terrain/imu_terrain`
 
@@ -131,10 +134,11 @@ runs/<bag name>/
 | `t` | s | ROS time |
 | `x`, `y` | m | robot position in `map` |
 | `speed` | m/s | from `/odom` |
-| `imu_roughness` | m/s² | latest `/terrain/imu_roughness` |
+| `imu_roughness` | ratio | latest `/terrain/imu_roughness`: power of vertical acceleration at 8-50 Hz over 0.5-8 Hz (plain RMS only follows speed, docs/PROGRESS.md section 3). `null` outside 0.25-0.50 m/s |
 | `camera_unevenness_mm` | mm | latest `/ground/unevenness` |
 | `terrain_camera`, `terrain_imu` | label | from the two classifiers, `null` if not running |
 | `hazards` | list | IDs of hazards seen in this stretch |
+| `surface_log` | label | offline only: the surface from the drive log in docs/DATA.md, for checking the classifiers |
 
 ### `hazards.json`
 
@@ -150,12 +154,12 @@ runs/<bag name>/
 | `id` | | `H1`, `H2` ... in the order first seen |
 | `type` | | `bump`, `hole` or `crack` |
 | `x`, `y` | m | position in `map` |
-| `length_mm`, `width_mm`, `height_mm` | mm | from the camera, at the closest sighting |
+| `length_mm`, `width_mm`, `height_mm` | mm | from the camera, at the closest sighting. Cracks: length and width of the crack on the ground, `height_mm` `null` |
 | `imu_peak` | m/s² | IMU spike when the wheels crossed it, `null` if not felt |
 | `crossing_speed` | m/s | speed at that moment, `null` if not crossed |
 | `class` | | `A` seen not felt, `B` felt not seen, `C` both |
 | `seen` | | number of frames it was detected in |
-| `crop` | | image file |
+| `crop` | | image file, `null` until crops are written |
 
 **Merging:** the same hazard appears in 10 to 30 frames as the robot
 approaches. Detections closer than 0.3 m are the same hazard. Average the
