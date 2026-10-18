@@ -162,6 +162,56 @@ Fix: raise `min_height` in the lab bring-up to about +0.10 m indoors (+0.15 m
 outdoors, for grass and tilt), and record `/rslidar_points` so scans can be
 remade offline. Then repeat the SLAM test.
 
+## 5. Everything on one map
+
+[tools/analysis/hazard_map.py](../tools/analysis/hazard_map.py) runs the whole chain
+offline on one bag and writes the map, `hazards.json` and `records.jsonl` in the
+format of [schema.md](schema.md) (example: [results/hazard_map_1628](results/hazard_map_1628/)):
+
+- **position**: wheel speed + IMU heading (section 4)
+- **bumps and holes**: the depth detection of section 1, placed on the ground with the
+  camera pose from the bag's TF (0.93 m ahead of the robot centre)
+- **cracks**: Yamin's crack U-Net v1 on the colour image, three times a second (75 ms
+  per frame on a laptop CPU); the crack pixels are put on the ground through the depth image
+- **roughness**: camera unevenness along the path (grey: light smooth, dark rough)
+- **class**: a hazard is **felt** when a wheel crosses it and the IMU jolt at that moment
+  stands out from the shaking around it. A = seen only, B = felt only, C = seen and felt
+
+![hazard map indoors](media/hazard_map_1447.png)
+
+On the tape-measured run all five objects are found. The 50 mm foam block (H2) and a
+15 mm wooden block (H6) are **seen and felt (C)**; the 20 mm foam strips are seen
+only (A), because foam squashes under the tyre. The four marks at y = 0.8-1.0 m are
+the table legs beside the corridor, never driven over. No felt-only (B) hazards.
+
+![hazard map outdoors](media/hazard_map_1628.png)
+
+Outdoors (1628, 28 m): the raised edges of the red rubber path (58-80 mm), the kerb
+(H76, 74 mm), a few real bumps on the wood chips, and the cracks along the asphalt at
+the end. Bumps and holes under 30 mm on rough ground (tufts, chips) are drawn faint.
+The 35 m loop is in [hazard_map_1548.png](media/hazard_map_1548.png).
+
+What was needed to get there:
+
+| problem | fix |
+|---|---|
+| A low hazard touching a wall or door frame was dropped with it (300 mm cap) | anything over 300 mm is cut out before clustering; ground-truth detections unchanged |
+| On wood chips under half the points lie on one plane, giving half-image "holes" | no hazards when the plane has under 50 % inliers (42 % of wood chip frames, 0-3 % elsewhere); unevenness is still reported |
+| Fixed 15 mm threshold boxed tufts and chips | threshold = max(15 mm, 3 x the frame's unevenness): unchanged on tile and asphalt, about 21 mm on grass. 1628: holes 57 -> 21 |
+| The crack model marks every tile grout line | long straight lines (100 px and more) are dropped: tile keeps 3-5 % of its "cracks", the asphalt cracks 97-100 % |
+| Kerb and door edges marked as cracks | crack pixels on a height step are dropped |
+| One jolt credited to every tuft next to the wheel | one jolt goes to the tallest hazard the wheel crossed |
+
+Limits of this first version:
+
+- The felt test is calibrated at 0.2 m/s on 1447 (plain tile up to 0.65 m/s², foam 0.63-0.69,
+  wood 0.81, block 1.1-1.9). At 0.4 m/s in `crossing_slow_1652` the foam strips also come out
+  as felt; the threshold has to depend on speed.
+- The felt-only (B) marks on asphalt (3 in 1628, 6 in 1548) are not checked against
+  anything; they may be crack edges or just the asphalt's fast shaking.
+- Positions drift with the wheel + IMU path, 0.4-0.7 m over 26 m (section 4).
+- `garden_surfaces_1536` (door step, drain grate) has no odometry, so it cannot be mapped.
+
 ---
 
 ## Problems found
@@ -169,7 +219,9 @@ remade offline. Then repeat the SLAM test.
 | problem | effect | next step |
 |---|---|---|
 | `/scan` contains the floor | SLAM and Nav2 unusable | change `min_height` in the lab bring-up |
-| Depth threshold outdoors | tufts and leaves on grass and wood chips boxed as 12-19 mm bumps | threshold that follows the surface's unevenness |
+| Depth threshold outdoors | tufts and leaves on grass and wood chips boxed as 12-19 mm bumps | done: threshold follows the unevenness (section 5), also in the node (`rough_factor`) |
+| Crack model on tile | every grout line is a crack | straight-line filter in the map; the real fix is tile frames as negatives in the fine-tune |
+| Felt test | calibrated at 0.2 m/s only | speed-dependent threshold from more crossing runs |
 | D435 drops off USB | 5 times on 2026-10-08, after fast or rough driving | secure the cable; report to the lab |
 | Wheel odometry heading | 15-30 deg error per run | fuse IMU heading with `robot_localization` |
 | GNSS | +-7-10 m, no fix in 2 of 5 runs | use for rough placement only |
@@ -179,6 +231,7 @@ remade offline. Then repeat the SLAM test.
 1. Fix the scan, repeat SLAM indoors and outdoors, build and save the indoor map.
 2. EKF live on the robot (config ready, tested offline), then Nav2 to a goal on the saved map.
 3. IMU roughness node with the frequency-band feature.
-4. Crack model and terrain classifier on the outdoor bags.
+4. Crack model fine-tuned on our frames with tile as negatives; terrain classifier on the outdoor bags.
+5. The hazard map live on the robot: the same chain as a node, with a speed-dependent felt test.
 
 Scripts for every figure: [tools/analysis](../tools/analysis/README.md).

@@ -151,17 +151,27 @@ Same wheel speeds in both paths, only the heading differs. The figure is the off
 
 The fix is to raise the scan's minimum height to about +0.10 m indoors (+0.15 m outdoors) in the lab bring-up, and to record the 3D lidar so scans can be remade offline.
 
-## 6. Known problems
+## 6. Everything on one map
+
+All of it on one bag, offline: bumps and holes from depth, cracks from the U-Net, roughness along the path, all placed with the wheel + IMU position. Each hazard gets its class by checking whether the IMU jolted when a wheel crossed it.
+
+<p align="center">
+  <img src="docs/media/hazard_map_1447.png" width="95%" alt="Hazard map of the tape-measured indoor run">
+</p>
+
+On the tape-measured run the 50 mm foam block and a 15 mm wooden block are seen and felt (class C); the 20 mm foam strips are seen only (A), because foam squashes under the tyre. Outdoors the map shows the kerb, the raised edges of the red rubber path and the cracks on the asphalt: [hazard_map_1628.png](docs/media/hazard_map_1628.png). Details, fixes and limits: [docs/PROGRESS.md section 5](docs/PROGRESS.md#5-everything-on-one-map). Script: [tools/analysis/hazard_map.py](tools/analysis/hazard_map.py).
+
+## 7. Known problems
 
 | Problem | Effect | Next step |
 |---|---|---|
 | The 2D scan contains the floor | SLAM and Nav2 unusable | Change `min_height` in the lab bring-up |
-| Fixed depth threshold outdoors | Tufts and leaves boxed as 12-19 mm bumps | Threshold that follows the surface's unevenness |
+| Fixed depth threshold outdoors | Tufts and leaves boxed as 12-19 mm bumps | Done: the threshold follows the surface's unevenness (section 6) |
 | D435 drops off USB | Happened 5 times on 8 October, after fast or rough driving | Secure the cable; reported to the lab |
 | Wheel odometry heading | 15-30° error per run | Fuse the IMU heading (EKF, ready) |
 | GNSS | ±7-10 m, no fix in 2 of 5 runs | Rough placement only |
 
-## 7. Next weeks
+## 8. Next weeks
 
 - **Week 3.** Fix the scan and build the indoor map; EKF live on the robot; IMU roughness node with the frequency-band feature; crack model on our outdoor runs; RGB terrain classifier v1 on the five labelled surfaces.
 - **Week 4.** More labelled outdoor runs (pavement, grass, gravel, dirt, slope) with repeats; map layer with the path coloured by roughness and hazard markers.
