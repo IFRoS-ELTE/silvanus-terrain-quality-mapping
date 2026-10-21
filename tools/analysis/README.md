@@ -13,6 +13,8 @@ sourced.
 | `render_outdoor.py BAG OUT` | the same for an outdoor run, with the path (wheel speed + IMU heading) coloured by the logged surface, camera unevenness and IMU fast/slow ratio over time. `~/bags/garden_surfaces_1628` made `docs/media/outdoor_run_1628.mp4` |
 | `outdoor_figures.py OUT_DIR` | `outdoor_surfaces.jpg` (camera and height map of a typical frame on each surface) and `outdoor_run_1628.png` (path, camera unevenness and IMU ratio of one run, with the median of each stretch) |
 | `hazard_map.py BAG OUT [--no-cracks]` | the whole chain on one bag: bumps, holes and cracks placed on the wheel + IMU path, roughness, A/B/C classes. Writes `map.png`, `hazards.json` and `records.jsonl` (docs/schema.md). Needs `vision_training/models/crack_unet16_v1.onnx` from the release unless `--no-cracks` |
+| `inspection_map.py BAG OUT` | the inspection map: the camera frames laid on the ground and stitched at 5 mm per pixel, cracks drawn on it, a photo and route position for every hazard, priorities. For `tools/inspection_viewer/` |
+| `inspection_rviz.py OUT` + `inspection.rviz` | the same in RViz, in 3D: the ground as coloured points, hazard columns (heights 5x), labels, route |
 | `run_slam.sh BAG OUT SCAN [LO HI]` | SLAM Toolbox with the lab's own config, offline from a bag, isolated on ROS domain 88. With `LO HI` it removes scan beams in that range first (`clean_scan.py`). Writes `OUT_map.pgm/.yaml` and `OUT_poses.csv` (`pose_logger.py`) |
 | `draw_maps.py` | draws those maps with the SLAM and wheel-odometry paths |
 | `deadreck.py BAG...` | dead reckoning with wheel heading, gyro-integrated heading and Xsens heading; prints how far each ends from the start |

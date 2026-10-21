@@ -202,6 +202,12 @@ What was needed to get there:
 | Kerb and door edges marked as cracks | crack pixels on a height step are dropped |
 | One jolt credited to every tuft next to the wheel | one jolt goes to the tallest hazard the wheel crossed |
 
+For whoever has to fix things, [tools/inspection_viewer](../tools/inspection_viewer/README.md) shows
+the same run as an inspection map: the camera frames laid on the ground and stitched into one photo
+of the driven strip (5 mm per pixel), the cracks drawn on it, and a work list sorted by priority with
+a photo of each item and where to find it (metres along the route, left or right).
+[inspection_rviz.py](../tools/analysis/inspection_rviz.py) puts the same in RViz in 3D.
+
 Limits of this first version:
 
 - The felt test is calibrated at 0.2 m/s on 1447 (plain tile up to 0.65 m/s², foam 0.63-0.69,

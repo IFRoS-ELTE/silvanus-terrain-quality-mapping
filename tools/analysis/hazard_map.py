@@ -151,7 +151,8 @@ def camera_pass(bag, t_start, path, T_bd, T_bc, seg):
     r = open_bag(bag, [DEPTH, DINFO, COLOR, CINFO])
     Kd = Kc = prev = col = None
     rng, n, last_crack = np.random.default_rng(0), 0, -9.0
-    dets, unev, cracks, stats = [], [], {}, dict(frames=0, skipped=0, crack_frames=0, crack_px=0, crack_kept=0)
+    dets, unev, cracks, planes = [], [], {}, []
+    stats = dict(frames=0, skipped=0, crack_frames=0, crack_px=0, crack_kept=0)
     while r.has_next():
         tp, data, st = r.read_next(); t = st * 1e-9 - t_start
         if tp == DINFO and Kd is None:
@@ -177,6 +178,7 @@ def camera_pass(bag, t_start, path, T_bd, T_bc, seg):
         if fit is None:
             prev = None; continue
         nrm, d, inl = fit; prev = (nrm, d); stats["frames"] += 1
+        planes.append((t, *nrm, d, inl))
         resid = ((cloud @ nrm) + d).astype(np.float32); resid[~valid] = 0
         resid = cv2.medianBlur(resid, 5)
         valid = cv2.erode(valid.astype(np.uint8), np.ones((5, 5), np.uint8)).astype(bool); resid[~valid] = 0
@@ -195,7 +197,7 @@ def camera_pass(bag, t_start, path, T_bd, T_bc, seg):
             pb = (T_bd @ np.r_[h["centroid"], 1.0])[:3]
             wx, wy = to_world(path, t, pb)
             dets.append(dict(t=t, type=h["type"], x=float(wx), y=float(wy), size_mm=h["size_mm"], length_mm=h["length_mm"],
-                             width_mm=h["width_mm"], range_m=h["range_m"]))
+                             width_mm=h["width_mm"], range_m=h["range_m"], centroid=h["centroid"]))
 
         # cracks, 3 times a second, on the latest colour frame
         if seg is None or col is None or Kc is None or t - last_crack < 0.33:
@@ -222,7 +224,7 @@ def camera_pass(bag, t_start, path, T_bd, T_bc, seg):
             wx, wy = to_world(path, t, pb)
             for key in set(zip(np.floor(wx / CELL).astype(int), np.floor(wy / CELL).astype(int))):
                 cracks.setdefault(key, set()).add(n)
-    return dets, np.array(unev), cracks, stats
+    return dets, np.array(unev), cracks, stats, np.array(planes)
 
 
 def merge(dets):
@@ -232,12 +234,12 @@ def merge(dets):
         for h in out:
             if h["type"] == d["type"] and np.hypot(h["x"] - d["x"], h["y"] - d["y"]) < MERGE_M:
                 h["xs"].append(d["x"]); h["ys"].append(d["y"]); h["x"], h["y"] = np.mean(h["xs"]), np.mean(h["ys"])
-                h["seen"] += 1
+                h["seen"] += 1; h["dets"].append(d)
                 if d["range_m"] < h["best"]["range_m"]:
                     h["best"] = d
                 break
         else:
-            out.append(dict(type=d["type"], x=d["x"], y=d["y"], xs=[d["x"]], ys=[d["y"]], seen=1, best=d, t_first=d["t"]))
+            out.append(dict(type=d["type"], x=d["x"], y=d["y"], xs=[d["x"]], ys=[d["y"]], seen=1, best=d, dets=[d], t_first=d["t"]))
     return [h for h in out if h["seen"] >= MIN_SEEN]
 
 
@@ -294,19 +296,19 @@ def felt(peak, base, k=1.0):
     return peak is not None and peak > k * max(2.0 * base[0], 1.3 * base[1], 0.75)
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("bag"); ap.add_argument("out"); ap.add_argument("--no-cracks", action="store_true")
-    a = ap.parse_args()
-    bag = a.bag.rstrip("/"); name = os.path.basename(bag); os.makedirs(a.out, exist_ok=True)
+def crack_segmenter():
+    from crack_onnx import CrackSegmenter
+    return CrackSegmenter(os.path.join(REPO, "vision_training", "models", "crack_unet16_v1.onnx"), num_threads=4)
+
+
+def build(bag, use_cracks=True):
+    """Everything up to the classified hazards and the 0.25 m records, for this script and inspection_map.py."""
+    bag = bag.rstrip("/"); name = os.path.basename(bag)
     t_start = open_bag(bag, []).get_metadata().starting_time.nanoseconds * 1e-9
     T_bd, T_bc = camera_transforms(bag)
     path, R, J = motion(bag, t_start)
-    seg = None
-    if not a.no_cracks:
-        from crack_onnx import CrackSegmenter
-        seg = CrackSegmenter(os.path.join(REPO, "vision_training", "models", "crack_unet16_v1.onnx"), num_threads=4)
-    dets, U, cracks, stats = camera_pass(bag, t_start, path, T_bd, T_bc, seg)
+    seg = crack_segmenter() if use_cracks else None
+    dets, U, cracks, stats, planes = camera_pass(bag, t_start, path, T_bd, T_bc, seg)
 
     hazards = merge(dets) + crack_hazards(cracks)
     explained = []
@@ -359,20 +361,26 @@ def main():
         explained.append(t)
 
     hazards.sort(key=lambda h: h.get("t_first", h.get("crossing_t") or 0) if h["type"] != "crack" else 1e9 + h["x"])
-    out = []
     for i, h in enumerate(hazards, 1):
         h["id"] = f"H{i}"
-        b = h.get("best", {})
-        out.append({"id": h["id"], "type": h["type"], "x": round(h["x"], 2), "y": round(h["y"], 2),
-                    "length_mm": round(b.get("length_mm", h.get("length_mm", 0))) if h["class"] != "B" else None,
-                    "width_mm": round(b.get("width_mm", h.get("width_mm", 0))) if h["class"] != "B" else None,
-                    "height_mm": round(b["size_mm"]) if "size_mm" in b else None,
-                    "imu_peak": round(h["imu_peak"], 2) if h["imu_peak"] is not None else None,
-                    "crossing_speed": round(h["crossing_speed"], 2) if h["crossing_speed"] is not None else None,
-                    "class": h["class"], "seen": h["seen"], "crop": None})
-    json.dump(out, open(os.path.join(a.out, "hazards.json"), "w"), indent=1)
+    recs = records(name, t_start, path, R, U, hazards)
+    return dict(bag=bag, name=name, t_start=t_start, T_bd=T_bd, T_bc=T_bc, path=path, R=R, J=J, U=U,
+                hazards=hazards, cracks=cracks, planes=planes, stats=stats, recs=recs, seg=seg)
 
-    # one record per 0.25 m driven
+
+def hazard_json(h):
+    b = h.get("best", {})
+    return {"id": h["id"], "type": h["type"], "x": round(h["x"], 2), "y": round(h["y"], 2),
+            "length_mm": round(b.get("length_mm", h.get("length_mm", 0))) if h["class"] != "B" else None,
+            "width_mm": round(b.get("width_mm", h.get("width_mm", 0))) if h["class"] != "B" else None,
+            "height_mm": round(b["size_mm"]) if "size_mm" in b else None,
+            "imu_peak": round(h["imu_peak"], 2) if h["imu_peak"] is not None else None,
+            "crossing_speed": round(h["crossing_speed"], 2) if h["crossing_speed"] is not None else None,
+            "class": h["class"], "seen": h["seen"], "crop": h.get("crop")}
+
+
+def records(name, t_start, path, R, U, hazards):
+    """One record per 0.25 m driven."""
     segs = SURFACES.get(name, [])
     recs, marks = [], np.arange(0.25, path["s"][-1], 0.25)
     prev_t = 0.0
@@ -389,6 +397,19 @@ def main():
                      "surface_log": next((sname for sname, s0, s1 in segs if s0 <= t <= s1), None),
                      "hazards": [h["id"] for h in hazards if prev_t < (h.get("t_first") or -1) <= t]})
         prev_t = t
+    return recs
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("bag"); ap.add_argument("out"); ap.add_argument("--no-cracks", action="store_true")
+    a = ap.parse_args()
+    os.makedirs(a.out, exist_ok=True)
+    ctx = build(a.bag, not a.no_cracks)
+    name, path, hazards, recs, stats, seg = ctx["name"], ctx["path"], ctx["hazards"], ctx["recs"], ctx["stats"], ctx["seg"]
+    out = [hazard_json(h) for h in hazards]
+    json.dump(out, open(os.path.join(a.out, "hazards.json"), "w"), indent=1)
+
     with open(os.path.join(a.out, "records.jsonl"), "w") as f:
         f.writelines(json.dumps(r) + "\n" for r in recs)
 

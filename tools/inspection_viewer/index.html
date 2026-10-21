@@ -1,0 +1,402 @@
+<title>Silvanus Ground Inspection</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one-screen tool. Stitched ground map on the left, work list and hazard card on the right; stacks on phones. */
+:root {
+  --bg: #e9ecea; --panel: #f8f9f8; --ink: #1d2321; --muted: #5d6763; --line: #d3d9d6; --mapbg: #dfe3e1;
+  --accent: #d9680a; --crack: #ff9614; --bump: #e34948; --hole: #2a78d6;
+  --high: #c8352a; --medium: #a8750a; --low: #7a8480; --check: #5f50c8; --ok: #2f7d4f;
+  --chip: #edf0ee; --sel: rgba(217,104,10,.12);
+  --f-ui: "Barlow", "Segoe UI", system-ui, sans-serif;
+  --f-head: "Barlow Semi Condensed", "Barlow", "Segoe UI", system-ui, sans-serif;
+  --f-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121615; --panel: #1a1f1d; --ink: #e5e9e7; --muted: #9aa39f; --line: #2c3331; --mapbg: #0d100f;
+  --accent: #ff9a3c; --crack: #ff9614; --bump: #ff6b62; --hole: #5aa2ff;
+  --high: #ff6b5c; --medium: #e8b13a; --low: #8d9692; --check: #a596ff; --ok: #5fc48a;
+  --chip: #232927; --sel: rgba(255,154,60,.14); color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121615; --panel: #1a1f1d; --ink: #e5e9e7; --muted: #9aa39f; --line: #2c3331; --mapbg: #0d100f;
+  --accent: #ff9a3c; --crack: #ff9614; --bump: #ff6b62; --hole: #5aa2ff;
+  --high: #ff6b5c; --medium: #e8b13a; --low: #8d9692; --check: #a596ff; --ok: #5fc48a;
+  --chip: #232927; --sel: rgba(255,154,60,.14); color-scheme: dark }
+
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-ui); font-size: 15px; line-height: 1.45; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--panel); }
+.shell { height: 100%; display: flex; flex-direction: column; }
+
+/* top bar */
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; background: var(--panel); border-bottom: 1px solid var(--line);
+  padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.brand { display: flex; flex-direction: column; min-width: 0; }
+.brand b { font-family: var(--f-head); font-size: 21px; letter-spacing: .01em; line-height: 1.1; }
+.brand span { color: var(--muted); font-size: 13px; }
+.runs { display: flex; flex-wrap: wrap; gap: 6px; }
+.run { font: inherit; text-align: left; border: 1px solid var(--line); background: var(--chip); color: var(--ink); border-radius: 8px; padding: 5px 11px; cursor: pointer; line-height: 1.2; }
+.run small { display: block; color: var(--muted); font-size: 12px; }
+.run[aria-pressed="true"] { border-color: var(--accent); background: var(--sel); }
+.run:focus-visible, button:focus-visible, .row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.stats { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-left: auto; font-size: 13px; color: var(--muted); }
+.stat b { display: block; font-family: var(--f-data); font-weight: 500; font-size: 17px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.stat.high b { color: var(--high); } .stat.crack b { color: var(--accent); } .stat.check b { color: var(--check); }
+
+/* main */
+.app { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 400px; }
+.mapwrap { position: relative; min-width: 0; min-height: 0; background: var(--mapbg); overflow: hidden; }
+#map { position: absolute; inset: 0; cursor: grab; touch-action: none; }
+#map.drag { cursor: grabbing; }
+#stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+#stage img { position: absolute; left: 0; top: 0; max-width: none; user-select: none; -webkit-user-drag: none; pointer-events: none; }
+#ground { -webkit-mask-size: 100% 100%; mask-size: 100% 100%; }
+#overlay { position: absolute; left: 0; top: 0; overflow: visible; }
+.route { fill: none; stroke: var(--ink); stroke-opacity: .35; stroke-width: 2; stroke-dasharray: 6 6; vector-effect: non-scaling-stroke; }
+.mk { cursor: pointer; transform-box: view-box; }
+.mk .shape { stroke-width: 2.2; vector-effect: non-scaling-stroke; }
+.mk .ring { fill: none; stroke-width: 2.5; vector-effect: non-scaling-stroke; opacity: 0; }
+.mk.p-high .ring { stroke: var(--high); opacity: 1; }
+.mk.p-check .ring { stroke: var(--check); opacity: 1; stroke-dasharray: 3 3; }
+.mk.sel .ring { stroke: var(--accent); opacity: 1; stroke-width: 4; stroke-dasharray: none; }
+.mk:hover .shape { filter: brightness(1.15); }
+.hide-low .mk.p-low { display: none; }
+.hide-crk .mk.t-crack { display: none; }
+.hide-haz .mk.t-bump, .hide-haz .mk.t-hole { display: none; }
+.hide-route .route { display: none; }
+
+.panel-float { position: absolute; display: flex; flex-wrap: wrap; gap: 6px; background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border: 1px solid var(--line); border-radius: 10px; padding: 6px; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.layers { left: calc(10px + env(safe-area-inset-left, 0px)); top: 10px; max-width: calc(100% - 20px); }
+.layers label { display: flex; align-items: center; gap: 6px; font-size: 13px; padding: 3px 8px; border-radius: 6px; cursor: pointer; user-select: none; }
+.layers label:hover { background: var(--chip); }
+.layers input { accent-color: var(--accent); }
+.sw { width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
+.zoom { right: calc(10px + env(safe-area-inset-right, 0px)); bottom: calc(10px + env(safe-area-inset-bottom, 0px)); flex-direction: column; }
+.zoom button { width: 34px; height: 34px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 7px; font: 600 18px var(--f-ui); cursor: pointer; }
+.scale { left: calc(10px + env(safe-area-inset-left, 0px)); bottom: calc(10px + env(safe-area-inset-bottom, 0px)); align-items: center; font: 12px var(--f-data); color: var(--muted); padding: 6px 10px; }
+.scale i { display: block; height: 6px; border: 2px solid var(--ink); border-top: 0; }
+.loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 14px; pointer-events: none; }
+
+/* side panel */
+.side { background: var(--panel); border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.detail { padding: 14px 16px 16px; border-bottom: 1px solid var(--line); }
+.detail .empty { color: var(--muted); font-size: 14px; }
+.detail .empty b { display: block; color: var(--ink); font-family: var(--f-head); font-size: 17px; margin-bottom: 4px; }
+.card-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.card-head h2 { margin: 0; font-family: var(--f-head); font-size: 22px; line-height: 1.15; text-wrap: balance; }
+.card-head code { font: 500 13px var(--f-data); color: var(--muted); }
+.photo { margin: 10px 0; border-radius: 8px; overflow: hidden; background: var(--chip); aspect-ratio: 4 / 3; display: grid; place-items: center; }
+.photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo p { margin: 0; padding: 16px; color: var(--muted); font-size: 13px; text-align: center; }
+dl.facts { display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; margin: 0; font-size: 14px; }
+dl.facts dt { color: var(--muted); }
+dl.facts dd { margin: 0; min-width: 0; }
+.num { font-family: var(--f-data); font-variant-numeric: tabular-nums; }
+.note { margin-top: 10px; font-size: 13px; color: var(--check); }
+.pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; padding: 2px 8px; border-radius: 99px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.high { color: var(--high); } .pill.medium { color: var(--medium); } .pill.low { color: var(--low); } .pill.check { color: var(--check); }
+
+.list-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px 8px; }
+.list-head h3 { margin: 0 auto 0 0; font-family: var(--f-head); font-size: 17px; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { font: inherit; font-size: 13px; padding: 4px 9px; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--sel); color: var(--ink); }
+.lowtoggle { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.lowtoggle input { accent-color: var(--accent); }
+#list { list-style: none; margin: 0; padding: 0 8px 12px; overflow-y: auto; flex: 1; min-height: 0; }
+.row { width: 100%; display: grid; grid-template-columns: 74px 22px 1fr auto; align-items: center; gap: 8px; text-align: left; font: inherit; color: var(--ink);
+  background: transparent; border: 0; border-radius: 8px; padding: 7px 8px; cursor: pointer; }
+.row:hover { background: var(--chip); }
+.row[aria-current="true"] { background: var(--sel); }
+.row .what { min-width: 0; }
+.row .what b { font-weight: 600; }
+.row .what span { display: block; color: var(--muted); font-size: 12.5px; }
+.row .id { font: 12px var(--f-data); color: var(--muted); }
+.glyph { width: 18px; height: 18px; }
+.more { padding: 6px 16px 14px; font-size: 12.5px; color: var(--muted); }
+.more summary { cursor: pointer; color: var(--ink); font-weight: 500; }
+.more p { margin: 6px 0 0; max-width: 60ch; }
+
+@media (max-width: 860px) {
+  html, body { height: auto; }
+  .shell { height: auto; }
+  .app { grid-template-columns: 1fr; }
+  .mapwrap { height: 62vh; min-height: 320px; }
+  .side { border-left: 0; border-top: 1px solid var(--line); }
+  #list { overflow: visible; }
+  .stats { margin-left: 0; }
+}
+@media (prefers-reduced-motion: no-preference) { #stage.anim { transition: transform .35s ease; } }
+</style>
+
+<div class="shell">
+  <header class="top">
+    <div class="brand"><b>Silvanus ground inspection</b><span>Stitched from the robot's camera, 5 mm per pixel</span></div>
+    <div class="runs" id="runs" role="group" aria-label="Recorded run"></div>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <main class="app">
+    <section class="mapwrap" aria-label="Map of the driven ground">
+      <div id="map">
+        <div id="stage">
+          <img id="ground" alt="Ground stitched from the robot camera">
+          <img id="cracks" alt="">
+          <svg id="overlay" xmlns="http://www.w3.org/2000/svg"></svg>
+        </div>
+        <div class="loading" id="loading">Loading the run</div>
+      </div>
+      <div class="panel-float layers" role="group" aria-label="Layers">
+        <label><input type="checkbox" id="l-crk" checked><span class="sw" style="background:var(--crack)"></span>Cracks</label>
+        <label><input type="checkbox" id="l-haz" checked><span class="sw" style="background:var(--bump)"></span>Bumps and holes</label>
+        <label><input type="checkbox" id="l-route" checked>Route</label>
+        <label><input type="checkbox" id="l-photo" checked>Ground photo</label>
+      </div>
+      <div class="panel-float scale" aria-hidden="true"><i id="scalebar"></i><span id="scaletxt">1 m</span></div>
+      <div class="panel-float zoom">
+        <button id="zin" aria-label="Zoom in">+</button>
+        <button id="zout" aria-label="Zoom out">−</button>
+        <button id="zfit" aria-label="Show the whole run" style="font-size:13px">Fit</button>
+      </div>
+    </section>
+
+    <aside class="side">
+      <div class="detail" id="detail"></div>
+      <div class="list-head">
+        <h3>Work list</h3>
+        <div class="seg" role="group" aria-label="Show">
+          <button data-f="all" aria-pressed="true">All</button>
+          <button data-f="crack" aria-pressed="false">Cracks</button>
+          <button data-f="haz" aria-pressed="false">Bumps, holes</button>
+          <button data-f="check" aria-pressed="false">Check</button>
+        </div>
+        <label class="lowtoggle"><input type="checkbox" id="showlow">Low priority (<span id="nlow">0</span>)</label>
+      </div>
+      <ol id="list"></ol>
+      <details class="more">
+        <summary>How to read this</summary>
+        <p id="rules"></p>
+        <p>Positions come from wheel speed and the IMU heading, good to a few tens of centimetres over a run. Route metres count from where the robot started.</p>
+      </details>
+    </aside>
+  </main>
+</div>
+
+<script>
+const RUNS = [
+  { id: "1628", name: "Garden run", sub: "8 Oct · red path, wood chips, grass, asphalt" },
+  { id: "1548", name: "Garden loop", sub: "8 Oct · asphalt, grass, cracked asphalt" },
+  { id: "1447", name: "Corridor test", sub: "8 Oct · tape-measured objects" },
+];
+const ORDER = { high: 0, check: 1, medium: 2, low: 3 };
+const TYPE = { bump: "Bump", hole: "Hole", crack: "Crack" };
+const CLASS = { A: "Seen by the camera, not felt", B: "Felt by the IMU, not seen", C: "Seen and felt" };
+const $ = s => document.querySelector(s);
+const map = $("#map"), stage = $("#stage"), svg = $("#overlay");
+let D = null, run = null, sel = null, filt = "all";
+let s = 1, tx = 0, ty = 0;
+
+/* ---------- view transform ---------- */
+function apply() {
+  stage.style.transform = `translate(${tx}px,${ty}px) scale(${s})`;
+  svg.style.setProperty("--k", (1 / s).toFixed(4));
+  // scale bar: a round length between 60 and 160 screen px
+  const pxPerM = s / D.m_per_px;
+  const nice = [0.1, 0.2, 0.5, 1, 2, 5, 10].find(m => m * pxPerM >= 60) || 10;
+  $("#scalebar").style.width = (nice * pxPerM).toFixed(0) + "px";
+  $("#scaletxt").textContent = nice < 1 ? `${nice * 100} cm` : `${nice} m`;
+}
+function zoomAt(f, cx, cy) {
+  const ns = Math.min(Math.max(s * f, 0.03), 6);
+  tx = cx - (cx - tx) * (ns / s); ty = cy - (cy - ty) * (ns / s); s = ns; apply();
+}
+function fit(anim) {
+  const xs = D.path.map(p => p[0]), ys = D.path.map(p => p[1]);
+  const pad = 0.9 / D.m_per_px;
+  const x0 = Math.max(Math.min(...xs) - pad, 0), x1 = Math.min(Math.max(...xs) + pad, D.width_px);
+  const y0 = Math.max(Math.min(...ys) - pad, 0), y1 = Math.min(Math.max(...ys) + pad, D.height_px);
+  const r = map.getBoundingClientRect();
+  s = Math.min(r.width / (x1 - x0), r.height / (y1 - y0)) * 0.94;
+  tx = (r.width - (x1 - x0) * s) / 2 - x0 * s; ty = (r.height - (y1 - y0) * s) / 2 - y0 * s;
+  stage.classList.toggle("anim", !!anim); apply();
+}
+function centerOn(h) {
+  const r = map.getBoundingClientRect();
+  const target = Math.max(s, 0.6);
+  s = target; tx = r.width / 2 - h.px * s; ty = r.height / 2 - h.py * s;
+  stage.classList.add("anim"); apply();
+}
+map.addEventListener("wheel", e => {
+  e.preventDefault(); stage.classList.remove("anim");
+  const r = map.getBoundingClientRect();
+  zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
+}, { passive: false });
+const ptrs = new Map(); let pinch = null, moved = 0, downMark = null;
+map.addEventListener("pointerdown", e => {
+  // a marker is selected on release if the pointer barely moved; capturing the pointer
+  // would retarget the click to the map, so the marker is remembered here
+  downMark = e.target.closest && e.target.closest(".mk");
+  map.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]); moved = 0;
+  stage.classList.remove("anim"); map.classList.add("drag");
+  if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); }
+});
+map.addEventListener("pointermove", e => {
+  if (!ptrs.has(e.pointerId)) return;
+  const [px, py] = ptrs.get(e.pointerId);
+  if (ptrs.size === 2) {
+    ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+    const [a, b] = [...ptrs.values()]; const d = Math.hypot(a[0] - b[0], a[1] - b[1]); const r = map.getBoundingClientRect();
+    if (pinch) zoomAt(d / pinch, (a[0] + b[0]) / 2 - r.left, (a[1] + b[1]) / 2 - r.top);
+    pinch = d; moved += 10; return;
+  }
+  tx += e.clientX - px; ty += e.clientY - py; moved += Math.abs(e.clientX - px) + Math.abs(e.clientY - py);
+  ptrs.set(e.pointerId, [e.clientX, e.clientY]); apply();
+});
+["pointerup", "pointercancel"].forEach(t => map.addEventListener(t, e => {
+  ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = null; if (!ptrs.size) map.classList.remove("drag");
+  if (t === "pointerup" && downMark && moved < 6) select(downMark.dataset.id, false);
+  downMark = null;
+}));
+$("#zin").onclick = () => { const r = map.getBoundingClientRect(); stage.classList.add("anim"); zoomAt(1.6, r.width / 2, r.height / 2); };
+$("#zout").onclick = () => { const r = map.getBoundingClientRect(); stage.classList.add("anim"); zoomAt(1 / 1.6, r.width / 2, r.height / 2); };
+$("#zfit").onclick = () => fit(true);
+addEventListener("resize", () => D && fit(false));
+
+/* ---------- layers ---------- */
+const layer = (id, cls, el) => $(id).addEventListener("change", e => {
+  if (el) el.hidden = !e.target.checked; if (cls) svg.classList.toggle(cls, !e.target.checked);
+});
+layer("#l-crk", "hide-crk", $("#cracks")); layer("#l-haz", "hide-haz"); layer("#l-route", "hide-route"); layer("#l-photo", null, $("#ground"));
+$("#showlow").addEventListener("change", () => { svg.classList.toggle("hide-low", !$("#showlow").checked); renderList(); });
+document.querySelectorAll(".seg button").forEach(b => b.onclick = () => {
+  filt = b.dataset.f; document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", x === b)); renderList();
+});
+
+/* ---------- helpers ---------- */
+const where = h => h.side === "on the path" ? `${h.route_m} m along the route, on the wheel track`
+  : `${h.route_m} m along the route, ${Math.abs(h.offset_m).toFixed(1)} m to the ${h.side}`;
+function size(h) {
+  if (h.type === "crack") return `${(h.length_mm / 1000).toFixed(1)} m long`;
+  if (h.class === "B") return "size unknown";
+  return `${h.height_mm} mm ${h.type === "hole" ? "deep" : "high"}`;
+}
+function title(h) { return h.class === "B" ? "Jolt with nothing seen" : TYPE[h.type]; }
+function reason(h) {
+  if (h.note) return h.note;
+  if (h.type === "crack") return h.priority === "high" ? "1 m or longer" : h.priority === "medium" ? "0.4 m or longer" : "shorter than 0.4 m";
+  if (h.priority === "high") return h.height_mm >= 50 ? "50 mm or more" : "felt, and 30 mm or more";
+  if (h.priority === "medium") return h.class === "C" ? "felt by the wheels" : "30 mm or more";
+  if (h.class === "B") return "the IMU felt a jolt here but the camera saw nothing";
+  return h.rough_ground ? "small, on rough ground (tufts, chips)" : "small";
+}
+function glyph(h, k = 9) {
+  const col = h.type === "crack" ? "var(--crack)" : h.type === "hole" ? "var(--hole)" : "var(--bump)";
+  const fill = h.class === "C" || h.type === "crack" ? col : "var(--panel)";
+  if (h.class === "B") return `<rect class="shape" x="${-k * .8}" y="${-k * .8}" width="${k * 1.6}" height="${k * 1.6}" rx="2" fill="var(--panel)" stroke="var(--check)"/>`;
+  if (h.type === "crack") return `<path class="shape" d="M0 ${-k} L${k} 0 L0 ${k} L${-k} 0Z" fill="${fill}" stroke="var(--ink)" stroke-opacity=".5"/>`;
+  const d = h.type === "hole" ? `M${-k} ${-k * .7} L${k} ${-k * .7} L0 ${k}Z` : `M0 ${-k} L${k} ${k * .7} L${-k} ${k * .7}Z`;
+  return `<path class="shape" d="${d}" fill="${fill}" stroke="${col}"/>`;
+}
+
+/* ---------- rendering ---------- */
+function renderStats() {
+  const n = p => D.hazards.filter(h => h.priority === p).length;
+  $("#stats").innerHTML = `
+    <div class="stat"><b>${D.length_m} m</b>route</div>
+    <div class="stat crack"><b>${D.crack_length_m} m</b>of cracks</div>
+    <div class="stat high"><b>${n("high")}</b>high priority</div>
+    <div class="stat"><b>${n("medium")}</b>medium</div>
+    <div class="stat check"><b>${n("check")}</b>check on site</div>`;
+}
+function renderMap() {
+  const W = D.width_px, H = D.height_px, base = `runs/${run}/`;
+  stage.style.width = W + "px"; stage.style.height = H + "px";
+  const g = $("#ground");
+  g.style.width = W + "px"; g.style.height = H + "px";
+  g.style.webkitMaskImage = g.style.maskImage = `url(${base}cover.png)`;
+  g.src = base + "ground.jpg";
+  const c = $("#cracks"); c.style.width = W + "px"; c.style.height = H + "px"; c.src = base + "cracks.png";
+  svg.setAttribute("width", W); svg.setAttribute("height", H); svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const pts = D.path.map(p => p[0] + "," + p[1]).join(" ");
+  const marks = [...D.hazards].sort((a, b) => ORDER[b.priority] - ORDER[a.priority]).map(h =>
+    `<g class="mk t-${h.type} p-${h.priority}" data-id="${h.id}" style="transform: translate(${h.px}px, ${h.py}px) scale(var(--k))">
+       <circle class="ring" r="15"/>${glyph(h)}<title>${h.id} ${title(h)}, ${size(h)}</title></g>`).join("");
+  svg.innerHTML = `<polyline class="route" points="${pts}"/>${marks}`;
+  svg.classList.toggle("hide-low", !$("#showlow").checked);
+  let pending = 2; const done = () => { if (--pending === 0) $("#loading").hidden = true; };
+  g.onload = c.onload = done; g.onerror = c.onerror = done;
+}
+function visible(h) {
+  if (h.priority === "low" && !$("#showlow").checked) return false;
+  if (filt === "crack") return h.type === "crack";
+  if (filt === "haz") return h.type !== "crack" && h.class !== "B";
+  if (filt === "check") return h.priority === "check";
+  return true;
+}
+function renderList() {
+  const rows = D.hazards.filter(visible).sort((a, b) => ORDER[a.priority] - ORDER[b.priority] || a.route_m - b.route_m);
+  $("#nlow").textContent = D.hazards.filter(h => h.priority === "low").length;
+  $("#list").innerHTML = rows.length ? rows.map(h => `
+    <li><button class="row" data-id="${h.id}" aria-current="${h.id === sel}">
+      <span class="pill ${h.priority}">${h.priority === "check" ? "check" : h.priority}</span>
+      <svg class="glyph" viewBox="-11 -11 22 22" aria-hidden="true">${glyph(h)}</svg>
+      <span class="what"><b>${title(h)}</b> <span class="num">${size(h)}</span><span>${h.route_m} m${h.side === "on the path" ? ", wheel track" : `, ${h.side}`}${h.surface ? " · " + h.surface : ""}</span></span>
+      <span class="id">${h.id}</span></button></li>`).join("")
+    : `<li class="more">Nothing in this view. Switch on low priority to see the small ones.</li>`;
+  $("#list").querySelectorAll(".row").forEach(b => b.onclick = () => select(b.dataset.id, true));
+}
+function renderDetail() {
+  const h = D.hazards.find(x => x.id === sel);
+  if (!h) {
+    const top = D.hazards.filter(x => x.priority === "high").length;
+    $("#detail").innerHTML = `<div class="empty"><b>${RUNS.find(r => r.id === run).name}</b>
+      ${top ? `${top} high-priority item${top > 1 ? "s" : ""} on this run.` : "Nothing high priority on this run."}
+      Pick an item in the work list or on the map to see its photo, size and where to find it.</div>`;
+    return;
+  }
+  const photo = h.crop ? `<img src="runs/${run}/${h.crop}" alt="${title(h)} ${h.id}">`
+    : `<p>${h.class === "B" ? "Nothing to photograph: the camera saw no object here." : "No photo: " + (h.note || "outside the colour camera's view")}.</p>`;
+  const rows = [
+    ["Priority", `<span class="pill ${h.priority}">${h.priority}</span> ${reason(h)}`],
+    ["Where", where(h)],
+    ["Size", h.type === "crack" ? `<span class="num">${(h.length_mm / 1000).toFixed(2)} m × ${(h.width_mm / 1000).toFixed(2)} m</span> area`
+      : h.class === "B" ? "unknown" : `<span class="num">${h.height_mm} mm</span> ${h.type === "hole" ? "deep" : "high"}, <span class="num">${h.length_mm} × ${h.width_mm} mm</span>`],
+    ["Class", `${h.class}: ${CLASS[h.class]}`],
+    h.imu_peak != null ? ["IMU jolt", `<span class="num">${h.imu_peak} m/s²</span> at <span class="num">${h.crossing_speed} m/s</span>`] : null,
+    h.surface ? ["Surface", h.surface] : null,
+    h.seen ? ["Seen in", `<span class="num">${h.seen}</span> camera frames`] : null,
+  ].filter(Boolean);
+  $("#detail").innerHTML = `<div class="card-head"><h2>${title(h)}, ${size(h)}</h2><code>${h.id}</code></div>
+    <div class="photo">${photo}</div><dl class="facts">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`;
+}
+function select(id, pan) {
+  sel = id;
+  svg.querySelectorAll(".mk").forEach(m => m.classList.toggle("sel", m.dataset.id === id));
+  const m = svg.querySelector(`.mk[data-id="${id}"]`); if (m) svg.appendChild(m);
+  renderDetail(); renderList();
+  const h = D.hazards.find(x => x.id === id);
+  if (h && pan) centerOn(h);
+  if (h && matchMedia("(max-width: 860px)").matches && !pan) $("#detail").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function load(id) {
+  run = id; sel = null; $("#loading").hidden = false;
+  document.querySelectorAll(".run").forEach(b => b.setAttribute("aria-pressed", b.dataset.id === id));
+  try { history.replaceState(null, "", "#r" + id); } catch (e) {}
+  try {
+    D = await (await fetch(`runs/${id}/inspection.json`)).json();
+  } catch (e) {
+    $("#loading").textContent = "This run could not be loaded."; return;
+  }
+  $("#rules").textContent = `${D.rules.class}. Priority: ${D.rules.priority}. Rough ground: ${D.rules.rough_ground}.`;
+  renderStats(); renderMap(); renderDetail(); renderList(); fit(false);
+}
+
+$("#runs").innerHTML = RUNS.map(r => `<button class="run" data-id="${r.id}" aria-pressed="false">${r.name} <span class="num" style="color:var(--muted)">${r.id}</span><small>${r.sub}</small></button>`).join("");
+document.querySelectorAll(".run").forEach(b => b.onclick = () => load(b.dataset.id));
+const start = (location.hash.match(/^#r(\d{4})$/) || [])[1];
+load(RUNS.some(r => r.id === start) ? start : RUNS[0].id);
+</script>
