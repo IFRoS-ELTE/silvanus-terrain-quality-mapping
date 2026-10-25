@@ -3,17 +3,25 @@
 <package format="3">
   <name>crack_detection</name>
   <version>0.0.1</version>
-  <description>Simple RGB crack detector for the Silvanus simulation camera.</description>
-  <maintainer email="aritra@example.invalid">aritra-das</maintainer>
+  <description>U-Net crack segmentation with RGB boxes and depth projection for RViz.</description>
+  <maintainer email="aritradas080@gmail.com">Aritra Das</maintainer>
   <license>MIT</license>
 
   <depend>rclpy</depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
   <depend>cv_bridge</depend>
+  <depend>ament_index_python</depend>
+  <depend>geometry_msgs</depend>
+  <depend>tf2_ros</depend>
+  <depend>visualization_msgs</depend>
 
   <exec_depend>python3-opencv</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <!-- ONNX Runtime is installed with pip; see requirements.txt and Dockerfile. -->
   <exec_depend>ros2launch</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <test_depend>python3-pytest</test_depend>
 
   <export>
     <build_type>ament_python</build_type>

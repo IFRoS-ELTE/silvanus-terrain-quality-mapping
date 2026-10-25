@@ -22,10 +22,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ros-jazzy-tf2-ros \
       ros-jazzy-tf2-geometry-msgs \
       python3-numpy \
+      python3-pip \
  && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --no-cache-dir --break-system-packages onnxruntime==1.31.0
 
 WORKDIR /ws
 COPY src ./src
+# Weights stay outside Git. Copy them into the package before building the image.
+RUN test -s src/crack_detection/models/crack_unet16_v1.onnx
 RUN source /opt/ros/jazzy/setup.bash \
  && apt-get update \
  && rosdep update --rosdistro jazzy \

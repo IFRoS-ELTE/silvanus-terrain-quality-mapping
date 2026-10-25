@@ -1,26 +1,46 @@
+from pathlib import Path
+
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
-    return LaunchDescription([
+    share = Path(get_package_share_directory('crack_detection'))
+    defaults = {
+        'use_sim_time': ('false', bool),
+        'image_topic': ('/camera/camera/color/image_raw', str),
+        'model_path': (str(share / 'models/crack_unet16_v1.onnx'), str),
+        'config_path': ('', str),
+        'color_robot_mask': (str(share / 'models/robot_mask_color.png'), str),
+        'robot_mask': (str(share / 'models/robot_mask_depth.png'), str),
+        'publish_cloud': ('true', bool),
+        'publish_markers': ('true', bool),
+        'target_frame': ('', str),
+        'max_rate_hz': ('5.0', float),
+        'threshold': ('-1.0', float),
+        'min_area': ('150.0', float),
+        'min_length': ('1', int),
+        'num_threads': ('2', int),
+    }
+    arguments = [DeclareLaunchArgument(name, default_value=default)
+                 for name, (default, _) in defaults.items()]
+    arguments.append(DeclareLaunchArgument('run_rviz', default_value='false'))
+    parameters = {name: ParameterValue(LaunchConfiguration(name), value_type=kind)
+                  for name, (_, kind) in defaults.items()}
+    return LaunchDescription(arguments + [
         Node(
-            package='crack_detection',
-            executable='crack_bbox_node',
-            name='crack_bbox_node',
-            output='screen',
-            parameters=[{
-                'image_topic': '/camera/color/image_raw',
-                'debug_topic': '/crack_detection/debug_image',
-                'detections_topic': '/crack_detection/detections',
-                'dark_threshold': 80,
-                'min_area': 120.0,
-                'max_area': 12000.0,
-                'min_width': 12,
-                'min_height': 4,
-                'roi_y_min_ratio': 0.30,
-                'edge_margin_ratio': 0.04,
-                'morph_kernel_size': 5,
-            }],
+            package='crack_detection', executable='crack_bbox_node',
+            name='crack_bbox_node', output='screen', parameters=[parameters],
+        ),
+        Node(
+            package='rviz2', executable='rviz2', output='screen',
+            condition=IfCondition(LaunchConfiguration('run_rviz')),
+            arguments=['-d', str(share / 'rviz/crack_detection.rviz')],
+            parameters=[{'use_sim_time': parameters['use_sim_time']}],
         ),
     ])

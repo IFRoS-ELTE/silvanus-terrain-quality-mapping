@@ -1,0 +1,77 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Enabled: true
+  Name: root
+  Global Options:
+    Background Color: 30; 30; 30
+    Fixed Frame: camera_depth_optical_frame
+    Frame Rate: 30
+  Displays:
+    - Class: rviz_default_plugins/Image
+      Name: RGB crack boxes
+      Enabled: true
+      Value: true
+      Topic:
+        Value: /crack_detection/debug_image
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Depth: 1
+      Transport Hint: raw
+    - Class: rviz_default_plugins/Image
+      Name: Crack mask
+      Enabled: true
+      Value: true
+      Topic:
+        Value: /crack_detection/mask
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Depth: 1
+      Transport Hint: raw
+    - Class: rviz_default_plugins/PointCloud2
+      Name: Crack surface points
+      Enabled: true
+      Value: true
+      Topic:
+        Value: /crack_detection/points
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Depth: 1
+      Style: Points
+      Size (Pixels): 3
+      Size (m): 0.01
+      Color Transformer: RGB8
+      Position Transformer: XYZ
+      Decay Time: 0
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Crack markers
+      Enabled: false
+      Value: false
+      Topic:
+        Value: /crack_detection/markers
+        Reliability Policy: Reliable
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Depth: 1
+  Tools:
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/Interact
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 2
+      Focal Point:
+        X: 0
+        Y: 0
+        Z: 1
+      Pitch: 0.5
+      Yaw: 0.5
+Window Geometry:
+  Width: 1400
+  Height: 900
