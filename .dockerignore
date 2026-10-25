@@ -4,3 +4,14 @@ log/
 **/__pycache__/
 **/*.py[cod]
 .git/
+**/.git/
+**/.venv/
+**/.venvs/
+**/frames/
+**/bags/
+vision_training/data/
+vision_training/runs/
+**/*.mcap
+**/*.db3
+**/*.pt
+**/*.pth
