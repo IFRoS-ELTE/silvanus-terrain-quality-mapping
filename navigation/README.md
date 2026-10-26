@@ -33,14 +33,20 @@ from docs/PROGRESS.md running (`/scan_fixed`):
 ```bash
 python3 navigation/speed_governor.py --ros-args -p enable:=true
 ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args -r cmd_vel:=/cmd_vel_in
-ros2 topic echo /governor/state            # free / slow / stop and why
-ros2 topic echo /governor/felt             # felt or not, per hazard
+python3 navigation/governor_watch.py       # free / slow / stop and why, felt or not per hazard
 ```
 
 For Nav2, remap its velocity output to `/cmd_vel_in`. Without `enable:=true` it publishes
 only `/governor/state` and nothing on `/cmd_vel`. When the input stops for 0.5 s it sends
 zeros instead of holding the last speed. First live test: wheels off the ground, then
 `max_speed:=0.3`.
+
+To watch it decide, `python3 navigation/governor_watch.py` prints each change between free, slow
+and stop, and felt or not per hazard. To see it without the robot, on a recording:
+
+```bash
+navigation/replay_governor.sh ~/bags/corridor_groundtruth_1447 0.4
+```
 
 Tested offline (not yet on the robot):
 - `python3 -m pytest navigation/test_speed_governor.py`: 8 cases of the stop / slow / free

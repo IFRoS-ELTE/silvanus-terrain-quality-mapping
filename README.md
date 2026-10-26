@@ -10,7 +10,7 @@ The short version: **the camera predicts, the IMU confirms.**
   <img src="docs/media/robot_left_side.jpg" width="70%" alt="Silvanus in the lab">
 </p>
 
-*Last updated 15 October 2026, week 3 of 8. Final presentation at the end of November.*
+*Last updated 26 October 2026, week 4 of 8. Final presentation at the end of November.*
 
 ---
 
@@ -161,9 +161,16 @@ All of it on one bag, offline: bumps and holes from depth, cracks from the U-Net
   <img src="docs/media/hazard_map_1447.png" width="95%" alt="Hazard map of the tape-measured indoor run">
 </p>
 
-On the tape-measured run the 50 mm foam block and a 15 mm wooden block are seen and felt (class C); the 20 mm foam strips are seen only (A), because foam squashes under the tyre. Outdoors the map shows the kerb, the raised edges of the red rubber path and the cracks on the asphalt: [hazard_map_1628.png](docs/media/hazard_map_1628.png). Details, fixes and limits: [docs/PROGRESS.md section 5](docs/PROGRESS.md#5-everything-on-one-map). Script: [tools/analysis/hazard_map.py](tools/analysis/hazard_map.py). For whoever fixes the ground, [tools/inspection_viewer](tools/inspection_viewer/README.md) shows the same run as one stitched photo of the driven strip, with the cracks on it and a work list.
+On the tape-measured run the 50 mm foam block and a 15 mm wooden block are seen and felt (class C); the 20 mm foam strips are seen only (A), because foam squashes under the tyre. Outdoors the map shows the kerb, the raised edges of the red rubber path and the cracks on the asphalt: [hazard_map_1628.png](docs/media/hazard_map_1628.png). Details, fixes and limits: [docs/PROGRESS.md section 5](docs/PROGRESS.md#5-everything-on-one-map). Script: [tools/analysis/hazard_map.py](tools/analysis/hazard_map.py). For whoever fixes the ground, the same runs become an inspection map. The camera looks almost straight down, so its frames are laid flat on the ground and stitched into one photo of the driven strip at 5 mm per pixel, with the cracks drawn on it:
 
-On the robot the same idea runs live in the speed governor ([navigation/](navigation/README.md#speed-governor)): it slows to 0.20 m/s before every hazard on the wheel track so the IMU can feel it, stops for anything of 10 cm or more right in front or a lidar obstacle 40 cm from the bumper, and reports each hazard as felt (C) or not (A) once the rear wheels are past.
+<p align="center">
+  <img src="docs/media/inspection_1548.jpg" width="56%" alt="The 35 m garden loop stitched from the robot camera, cracks in orange">
+  <img src="docs/media/inspection_cracks_1628.jpg" width="42%" alt="Close-up of the crack network on the asphalt">
+</p>
+
+Left: the 35 m garden loop, asphalt at the top, grass below, 18 m of cracks in orange. Right: the cracked asphalt at the end of another run. A viewer page adds a work list sorted by priority, with a photo of each item and where to find it (metres along the route, left or right): [tools/inspection_viewer](tools/inspection_viewer/README.md).
+
+On the robot the same idea runs live in the speed governor ([navigation/](navigation/README.md#speed-governor)): it slows to 0.20 m/s before every hazard on the wheel track so the IMU can feel it, stops for anything of 10 cm or more right in front or a lidar obstacle 40 cm from the bumper, and reports each hazard as felt (C) or not (A) once the rear wheels are past. On a replay of the tape-measured run (`navigation/replay_governor.sh`) it slows for the foam block and finds it felt (1.81 m/s²). It still has to be tested on the robot.
 
 ## 7. Known problems
 
@@ -177,8 +184,8 @@ On the robot the same idea runs live in the speed governor ([navigation/](naviga
 
 ## 8. Next weeks
 
-- **Week 3.** Fix the scan and build the indoor map; EKF live on the robot; IMU roughness node with the frequency-band feature; crack model on our outdoor runs; RGB terrain classifier v1 on the five labelled surfaces.
-- **Week 4.** More labelled outdoor runs (pavement, grass, gravel, dirt, slope) with repeats; map layer with the path coloured by roughness and hazard markers.
+- **Week 3, done.** Crack U-Net in the robot's crack node with false-crack filters; camera and IMU fused into one map with the A/B/C classes; inspection map; speed governor, tested offline.
+- **Week 4, now.** At the robot: the scan fix checked in RViz, then the indoor map with SLAM; the speed governor live (wheels up first); crossing runs at 0.2, 0.3 and 0.4 m/s to make the felt test depend on speed; more labelled outdoor runs with repeats. Off the robot: crack model fine-tuned with our tile frames as "no crack"; RGB terrain classifier v1; IMU roughness node.
 - **Week 5.** Everything together, first on one bag and then live: the robot approaches a book, slows down by itself, crosses it, the IMU spike is logged and a confirmed marker appears on the map.
 - **Weeks 6-8.** Repeat runs, roughness vs speed, the camera unevenness vs IMU roughness comparison, hazard counts per class, the smallest hazard the robot feels, demo video and presentation.
 
