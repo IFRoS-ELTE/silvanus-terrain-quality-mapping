@@ -168,7 +168,13 @@ On the tape-measured run the 50 mm foam block and a 15 mm wooden block are seen 
   <img src="docs/media/inspection_cracks_1628.jpg" width="42%" alt="Close-up of the crack network on the asphalt">
 </p>
 
-Left: the 35 m garden loop, asphalt at the top, grass below, 18 m of cracks in orange. Right: the cracked asphalt at the end of another run. A viewer page adds a work list sorted by priority, with a photo of each item and where to find it (metres along the route, left or right): [tools/inspection_viewer](tools/inspection_viewer/README.md).
+Left: the 35 m garden loop, asphalt at the top, grass below, 18 m of cracks in orange. Right: the cracked asphalt at the end of another run. A viewer page adds a work list sorted by priority, with a photo of each item and where to find it (metres along the route, left or right). To open it from your copy of the repository:
+
+```bash
+cd tools/inspection_viewer && python3 -m http.server 8000      # then open http://localhost:8000
+```
+
+Details: [tools/inspection_viewer](tools/inspection_viewer/README.md).
 
 On the robot the same idea runs live in the speed governor ([navigation/](navigation/README.md#speed-governor)): it slows to 0.20 m/s before every hazard on the wheel track so the IMU can feel it, stops for anything of 10 cm or more right in front or a lidar obstacle 40 cm from the bumper, and reports each hazard as felt (C) or not (A) once the rear wheels are past. On a replay of the tape-measured run (`navigation/replay_governor.sh`) it slows for the foam block and finds it felt (1.81 m/s²). It still has to be tested on the robot.
 
