@@ -1626,10 +1626,10 @@
  {
   "id": "H117",
   "type": "crack",
-  "x": 8.63,
-  "y": -14.95,
-  "length_mm": 406,
-  "width_mm": 124,
+  "x": 8.65,
+  "y": -14.94,
+  "length_mm": 320,
+  "width_mm": 110,
   "height_mm": null,
   "imu_peak": null,
   "crossing_speed": null,
@@ -1640,10 +1640,10 @@
  {
   "id": "H118",
   "type": "crack",
-  "x": 9.19,
-  "y": -15.12,
-  "length_mm": 673,
-  "width_mm": 546,
+  "x": 9.15,
+  "y": -15.13,
+  "length_mm": 646,
+  "width_mm": 450,
   "height_mm": null,
   "imu_peak": null,
   "crossing_speed": null,
@@ -1724,15 +1724,15 @@
  {
   "id": "H124",
   "type": "crack",
-  "x": 10.94,
-  "y": -16.08,
-  "length_mm": 2093,
-  "width_mm": 435,
+  "x": 10.69,
+  "y": -15.98,
+  "length_mm": 1482,
+  "width_mm": 277,
   "height_mm": null,
   "imu_peak": null,
   "crossing_speed": null,
   "class": "A",
-  "seen": 16,
+  "seen": 13,
   "crop": null
  },
  {
@@ -1752,6 +1752,20 @@
  {
   "id": "H126",
   "type": "crack",
+  "x": 11.5,
+  "y": -16.3,
+  "length_mm": 680,
+  "width_mm": 418,
+  "height_mm": null,
+  "imu_peak": null,
+  "crossing_speed": null,
+  "class": "A",
+  "seen": 6,
+  "crop": null
+ },
+ {
+  "id": "H127",
+  "type": "crack",
   "x": 11.75,
   "y": -15.9,
   "length_mm": 364,
@@ -1764,7 +1778,7 @@
   "crop": null
  },
  {
-  "id": "H127",
+  "id": "H128",
   "type": "crack",
   "x": 11.79,
   "y": -16.55,
@@ -1778,7 +1792,21 @@
   "crop": null
  },
  {
-  "id": "H128",
+  "id": "H129",
+  "type": "crack",
+  "x": 11.88,
+  "y": -16.18,
+  "length_mm": 339,
+  "width_mm": 161,
+  "height_mm": null,
+  "imu_peak": null,
+  "crossing_speed": null,
+  "class": "A",
+  "seen": 4,
+  "crop": null
+ },
+ {
+  "id": "H130",
   "type": "crack",
   "x": 11.9,
   "y": -16.03,
@@ -1792,12 +1820,12 @@
   "crop": null
  },
  {
-  "id": "H129",
+  "id": "H131",
   "type": "crack",
-  "x": 12.06,
-  "y": -16.48,
-  "length_mm": 1248,
-  "width_mm": 325,
+  "x": 12.11,
+  "y": -16.56,
+  "length_mm": 1126,
+  "width_mm": 192,
   "height_mm": null,
   "imu_peak": null,
   "crossing_speed": null,
@@ -1806,7 +1834,7 @@
   "crop": null
  },
  {
-  "id": "H130",
+  "id": "H132",
   "type": "crack",
   "x": 12.38,
   "y": -16.95,
@@ -1820,7 +1848,7 @@
   "crop": null
  },
  {
-  "id": "H131",
+  "id": "H133",
   "type": "crack",
   "x": 12.89,
   "y": -16.51,
@@ -1834,7 +1862,7 @@
   "crop": null
  },
  {
-  "id": "H132",
+  "id": "H134",
   "type": "crack",
   "x": 13.43,
   "y": -16.75,
@@ -1844,11 +1872,11 @@
   "imu_peak": null,
   "crossing_speed": null,
   "class": "A",
-  "seen": 5,
+  "seen": 4,
   "crop": null
  },
  {
-  "id": "H133",
+  "id": "H135",
   "type": "crack",
   "x": 13.67,
   "y": -16.83,
@@ -1862,7 +1890,7 @@
   "crop": null
  },
  {
-  "id": "H134",
+  "id": "H136",
   "type": "crack",
   "x": 13.75,
   "y": -17.43,

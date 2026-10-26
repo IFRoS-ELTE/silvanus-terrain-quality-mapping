@@ -8,7 +8,8 @@ Everything the robot side and the crack model produce, put on one map:
   path        wheel speed + Xsens heading (docs/PROGRESS.md section 4)
   bumps/holes ground_probe.find_hazards on every 3rd depth frame, robot mask on.
               Skipped when under half of the points lie on the plane (wood chips)
-  cracks      the crack U-Net (vision_training/models/crack_unet16_v1.onnx) on the
+  cracks      the crack U-Net (crack_unet16_v1.onnx, in src/crack_detection/models or
+              vision_training/models) with the crack node's colour robot mask, on the
               colour image 3 times a second. Crack pixels go to 3D through the
               depth image. Dropped: long straight lines (tile grout, paint) and
               pixels on a height step (kerb and door edges)
@@ -205,7 +206,7 @@ def camera_pass(bag, t_start, path, T_bd, T_bc, seg):
         last_crack = t
         c = deserialize_message(col, Image)
         img = np.frombuffer(c.data, np.uint8).reshape(c.height, c.width, 3)
-        _, cmask = seg.predict(img, bgr=(c.encoding == "bgr8"))
+        _, cmask = seg.predict(img, bgr=(c.encoding == "bgr8"), ground_mask=seg.ground)
         cmask[straight_lines(cmask)] = 0
         stats["crack_frames"] += 1
         # depth pixels on flat ground, into the colour image
@@ -296,9 +297,19 @@ def felt(peak, base, k=1.0):
     return peak is not None and peak > k * max(2.0 * base[0], 1.3 * base[1], 0.75)
 
 
+COLOR_MASK = os.path.join(REPO, "src", "crack_detection", "models", "robot_mask_color.png")   # the crack node's
+
+
 def crack_segmenter():
-    from crack_onnx import CrackSegmenter
-    return CrackSegmenter(os.path.join(REPO, "vision_training", "models", "crack_unet16_v1.onnx"), num_threads=4)
+    """The crack U-Net and the crack node's colour robot mask (white = ground)."""
+    from crack_onnx import CrackSegmenter, load_ground_mask
+    for d in (("src", "crack_detection", "models"), ("vision_training", "models")):
+        path = os.path.join(REPO, *d, "crack_unet16_v1.onnx")
+        if os.path.exists(path):
+            seg = CrackSegmenter(path, meta_path=os.path.join(REPO, *d, "crack_unet16_v1.json"), num_threads=4)
+            seg.ground = load_ground_mask(COLOR_MASK, 640, 480)
+            return seg
+    raise SystemExit("crack_unet16_v1.onnx not found: download it from the crack-model-v1 release (docs/crack_model.md)")
 
 
 def build(bag, use_cracks=True):

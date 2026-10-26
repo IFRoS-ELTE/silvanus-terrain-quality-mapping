@@ -29,7 +29,7 @@ from sensor_msgs.msg import Image, CameraInfo
 
 RES = 0.005          # m per pixel of the stitched ground
 COLOR_EVERY = 5      # colour at 30 Hz: every 5th frame, 6 a second
-V_MAX = 405          # colour rows below this show the gripper
+V_MAX = 480          # rows of the colour image; the crack node's robot mask decides which are ground
 ROUGH_MM = 5.0       # same as the hazard map: small hazards on rougher ground are tufts and chips
 CRACK_RGB = (255, 150, 20)
 
@@ -97,7 +97,10 @@ def main():
         if tp == hm.CINFO:
             if Kc is None:
                 m = deserialize_message(data, CameraInfo); Kc = (m.k[0], m.k[4], m.k[2], m.k[5])
-                vv, uu = np.mgrid[0:V_MAX:2, 0:m.width:2]; vv, uu = vv.ravel(), uu.ravel()
+                vv, uu = np.mgrid[0:m.height:2, 0:m.width:2]; vv, uu = vv.ravel(), uu.ravel()
+                keep = seg.ground[vv, uu] > 0 if seg is not None else vv < 400
+                vv, uu = vv[keep], uu[keep]
+                V_MAX = int(vv.max()) + 1
                 rays = np.stack([(uu - Kc[2]) / Kc[0], (vv - Kc[3]) / Kc[1], np.ones(len(uu))], 1)
                 wgt = ((uu - m.width / 2) ** 2 + (vv - m.height / 2) ** 2).astype(np.float32)
                 # photo: the sighting where the hazard sits deepest inside the colour image (the depth
@@ -148,7 +151,7 @@ def main():
         cells = np.unique(py * W + px)
         cover_n.flat[cells] += 1
         if seg is not None:
-            _, cm = seg.predict(img, bgr=(c.encoding == "bgr8"))
+            _, cm = seg.predict(img, bgr=(c.encoding == "bgr8"), ground_mask=seg.ground)
             cm[hm.straight_lines(cm)] = 0
             hit = cm[v, u] > 0
             crack_n.flat[np.unique(py[hit] * W + px[hit])] += 1
