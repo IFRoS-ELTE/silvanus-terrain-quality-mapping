@@ -26,6 +26,7 @@ from visualization_msgs.msg import Marker, MarkerArray
 
 from crack_detection.camera_calibration import transform_matrix, transform_points
 from crack_detection.crack_onnx import CrackSegmenter
+from crack_detection.crack_filters import step_edges_in_color, straight_lines
 from crack_detection.crack_projection import crack_surface_points
 
 
@@ -142,6 +143,8 @@ class CrackBBoxNode(Node):
             "target_frame": "", "sync_tolerance_s": 0.05,
             "zmin_m": 0.30, "zmax_m": 1.60, "depth_scale_m": 0.001,
             "cloud_stride": 2, "max_cloud_points": 5000, "marker_lifetime_s": 0.5,
+            "drop_straight_lines": True, "straight_min_length_px": 100,
+            "drop_step_edges": True, "step_edge_threshold_m": 0.03,
             "color_robot_mask": str(models / "robot_mask_color.png"),
             "robot_mask": str(models / "robot_mask_depth.png"),
         }
@@ -150,13 +153,15 @@ class CrackBBoxNode(Node):
         self.options = {name: self.get_parameter(name).value for name in parameters}
         p = self.options
         finite_parameters = ("max_rate_hz", "zmin_m", "zmax_m", "sync_tolerance_s",
-                             "depth_scale_m", "marker_lifetime_s", "min_area", "threshold")
+                             "depth_scale_m", "marker_lifetime_s", "min_area", "threshold",
+                             "step_edge_threshold_m")
         if (not np.isfinite([p[name] for name in finite_parameters]).all() or p["max_rate_hz"] <= 0
                 or not 0 < p["zmin_m"] < p["zmax_m"] or p["sync_tolerance_s"] <= 0
                 or p["depth_scale_m"] <= 0 or p["cloud_stride"] < 1
                 or p["max_cloud_points"] < 1 or p["max_boxes"] < 0 or p["min_area"] < 1 or p["min_length"] < 1
                 or p["marker_lifetime_s"] <= 0 or p["num_threads"] < 1
-                or (p["threshold"] != -1 and not 0 < p["threshold"] < 1)):
+                or (p["threshold"] != -1 and not 0 < p["threshold"] < 1)
+                or p["straight_min_length_px"] < 10 or p["step_edge_threshold_m"] <= 0):
             raise ValueError("Invalid crack node rate, depth range, synchronization, or display parameters")
         self.seg = CrackSegmenter(
             p["model_path"], meta_path=p["config_path"] or None, num_threads=p["num_threads"],
@@ -181,6 +186,7 @@ class CrackBBoxNode(Node):
         self.received = self.processed = 0
         self.inference_ms = 0.0
         self.project_3d = p["publish_cloud"] or p["publish_markers"]
+        self.needs_depth = self.project_3d or p["drop_step_edges"]
         # A single pending image prevents inference from building a camera backlog.
         sensor_qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.BEST_EFFORT,
                                 durability=DurabilityPolicy.VOLATILE)
@@ -190,9 +196,9 @@ class CrackBBoxNode(Node):
         self.info_pub = self.create_publisher(CameraInfo, "/crack_detection/camera_info", 1)
         self.create_subscription(Image, p["image_topic"], self.on_image, sensor_qos, callback_group=self.input_group)
         self.create_subscription(CameraInfo, p["color_info_topic"], self.on_color_info, sensor_qos, callback_group=self.input_group)
-        if self.project_3d:
-            self.cloud_pub = self.create_publisher(PointCloud2, "/crack_detection/points", 1) if p["publish_cloud"] else None
-            self.marker_pub = self.create_publisher(MarkerArray, "/crack_detection/markers", 1) if p["publish_markers"] else None
+        self.cloud_pub = self.create_publisher(PointCloud2, "/crack_detection/points", 1) if p["publish_cloud"] else None
+        self.marker_pub = self.create_publisher(MarkerArray, "/crack_detection/markers", 1) if p["publish_markers"] else None
+        if self.needs_depth:
             self.tf_buffer = Buffer(node=self)
             self.tf_listener = TransformListener(self.tf_buffer, self)
             self.create_subscription(Image, p["depth_topic"], self.on_depth, sensor_qos, callback_group=self.input_group)
@@ -201,7 +207,8 @@ class CrackBBoxNode(Node):
         self.create_timer(5.0, self.report)
         self.get_logger().info(
             f"U-Net threshold {self.seg.threshold:g}; RGB {p['image_topic']}; "
-            f"up to {p['max_rate_hz']:g} Hz; 3D projection {self.project_3d}"
+            f"up to {p['max_rate_hz']:g} Hz; 3D projection {self.project_3d}; "
+            f"drop straight lines {p['drop_straight_lines']}, step edges {p['drop_step_edges']}"
         )
 
     def on_image(self, message):
@@ -242,6 +249,13 @@ class CrackBBoxNode(Node):
             start = time.perf_counter()
             probability, mask = self.seg.predict(bgr, bgr=True, ground_mask=self.color_robot_mask)
             self.inference_ms = (time.perf_counter() - start) * 1000
+            paired = pair_error = None
+            if self.needs_depth:
+                try:
+                    paired = self.paired_depth(message.header, mask.shape)
+                except (ValueError, TransformException) as exc:
+                    pair_error = exc
+            mask = self.filter_mask(mask, paired)
             boxes = boxes_from_mask(mask, probability, self.options["min_area"], self.options["min_length"])
         except (ValueError, RuntimeError) as exc:
             self.get_logger().error(f"Crack inference failed: {exc}", throttle_duration_sec=5.0)
@@ -257,13 +271,33 @@ class CrackBBoxNode(Node):
         self.processed += 1
         if self.project_3d:
             try:
-                points, header = self.project_points(mask, message.header)
+                if paired is None:
+                    raise ValueError(str(pair_error))
+                points, header = self.project_points(mask, message.header, paired)
             except (ValueError, TransformException) as exc:
                 self.get_logger().warn(f"3D crack projection unavailable: {exc}", throttle_duration_sec=5.0)
                 points, header = np.empty((0, 3), np.float32), message.header
             self.publish_points(points, header)
 
-    def project_points(self, mask, rgb_header):
+    def filter_mask(self, mask, paired):
+        """Drop tile grout and painted lines (long straight runs) and, with depth, kerb and step edges."""
+        p = self.options
+        if p["drop_straight_lines"]:
+            mask[straight_lines(mask, p["straight_min_length_px"])] = 0
+        if p["drop_step_edges"]:
+            if paired is None:
+                self.get_logger().warn("No paired depth frame: step edges not filtered in this frame",
+                                       throttle_duration_sec=5.0)
+            else:
+                depth_m, di, ci, extrinsics, _ = paired
+                mask[step_edges_in_color(
+                    depth_m, (di.k[0], di.k[4], di.k[2], di.k[5]), (ci.k[0], ci.k[4], ci.k[2], ci.k[5]),
+                    extrinsics, mask.shape, valid_mask=self.robot_mask, zmin=p["zmin_m"], zmax=p["zmax_m"],
+                    threshold=p["step_edge_threshold_m"])] = 0
+        return mask
+
+    def paired_depth(self, rgb_header, mask_shape):
+        """The depth frame nearest the RGB frame, checked against both CameraInfos, and the depth-to-RGB transform."""
         with self.input_lock:
             depth_frames = tuple(self.depth_frames)
             ci, di = self.color_info, self.depth_info
@@ -273,7 +307,7 @@ class CrackBBoxNode(Node):
         offset = abs(stamp_ns(depth.header) - stamp_ns(rgb_header)) * 1e-9
         if offset > self.options["sync_tolerance_s"]:
             raise ValueError(f"RGB/depth timestamps differ by {offset:.3f} s")
-        if ((ci.height, ci.width) != mask.shape or (di.height, di.width) != (depth.height, depth.width)
+        if ((ci.height, ci.width) != mask_shape or (di.height, di.width) != (depth.height, depth.width)
                 or ci.header.frame_id != rgb_header.frame_id or di.header.frame_id != depth.header.frame_id):
             raise ValueError("CameraInfo dimensions or frame IDs do not match the images")
         depth_m = decode_image(depth).astype(np.float32)
@@ -285,6 +319,14 @@ class CrackBBoxNode(Node):
         if robot_mask is not None and robot_mask.shape != depth_m.shape:
             raise ValueError("Robot mask dimensions differ from depth; supply the correct mask or disable it")
         extrinsics = self.lookup_matrix(rgb_header.frame_id, depth.header.frame_id, depth.header.stamp)
+        return depth_m, di, ci, extrinsics, depth.header
+
+    def project_points(self, mask, rgb_header, paired=None):
+        """Crack pixels to 3D; `paired` is the depth frame already found for the step filter."""
+        if paired is None:
+            paired = self.paired_depth(rgb_header, mask.shape)
+        depth_m, di, ci, extrinsics, depth_header = paired
+        robot_mask = self.robot_mask
         points = crack_surface_points(
             mask, depth_m, (di.k[0], di.k[4], di.k[2], di.k[5]),
             (ci.k[0], ci.k[4], ci.k[2], ci.k[5]), extrinsics,
@@ -292,7 +334,7 @@ class CrackBBoxNode(Node):
             stride=self.options["cloud_stride"], max_points=self.options["max_cloud_points"],
             distortion=ci.d, distortion_model=ci.distortion_model,
         )
-        header = copy.deepcopy(depth.header)
+        header = copy.deepcopy(depth_header)
         target = self.options["target_frame"]
         if target and target != header.frame_id:
             points = transform_points(points, self.lookup_matrix(target, header.frame_id, header.stamp)).astype(np.float32)

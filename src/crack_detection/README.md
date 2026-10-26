@@ -66,8 +66,8 @@ Override it with `image_topic:=...` if needed. Add
 
 For a custom model, pass `model_path:=/absolute/model.onnx`; the adjacent JSON
 is used unless `config_path:=...` is supplied. Other launch arguments include
-`threshold:=0.8`, `min_area:=150.0`, `min_length:=1`, `max_rate_hz:=5.0`, and
-`num_threads:=2`. Inference time and frame counts are logged every 5 seconds.
+`threshold:=0.8`, `min_area:=150.0`, `min_length:=1`, `max_rate_hz:=5.0`,
+`num_threads:=2`, `drop_straight_lines:=true` and `drop_step_edges:=true`. Inference time and frame counts are logged every 5 seconds.
 
 ## Outputs
 
@@ -75,7 +75,7 @@ is used unless `config_path:=...` is supplied. Other launch arguments include
 |---|---|---|
 | `/crack_detection/detections` | `std_msgs/String` | Existing JSON: `stamp`, `frame_id`, `count`, `boxes` with `x`, `y`, `width`, `height`, `area`, `score` |
 | `/crack_detection/debug_image` | `sensor_msgs/Image` | RGB with yellow boxes only |
-| `/crack_detection/mask` | `sensor_msgs/Image` | Full-size mono8 segmentation, 0/255 |
+| `/crack_detection/mask` | `sensor_msgs/Image` | Full-size mono8 segmentation, 0/255, after the false-crack filters |
 | `/crack_detection/camera_info` | `sensor_msgs/CameraInfo` | Colour calibration with the processed RGB header |
 | `/crack_detection/points` | `sensor_msgs/PointCloud2` | Yellow measured surface points associated with cracks |
 | `/crack_detection/markers` | `visualization_msgs/MarkerArray` | Short-lived RViz points |
@@ -96,6 +96,28 @@ stamp. Persistent map storage, tracking and the future
 `/crack_detection/hazards` Detection3DArray interface from the team guide still
 require fusion work. If depth, calibration or TF is unavailable, 2D outputs
 continue; 3D outputs are empty with a throttled diagnostic.
+
+## False-crack filters
+
+The U-Net also marks tile grout, painted lines and the edges of kerbs and door steps.
+Two filters remove them from the mask before boxes, 3D points and the published mask
+are made. Both are on by default:
+
+| Parameter | Default | What it removes |
+|---|---|---|
+| `drop_straight_lines` | `true` | straight runs of `straight_min_length_px` (100) or more: tile grout, painted lines |
+| `drop_step_edges` | `true` | crack pixels on a height step in the depth image (Sobel of the 5x5 median depth above `step_edge_threshold_m`, 0.03): kerb and door edges. Needs the paired depth frame and TF; without them the frame is not filtered and a warning is logged |
+
+Measured with this node on the 2026-10-08 recordings (`ros2 bag play`, 5 Hz):
+
+| Recording | Filters off | Filters on |
+|---|---|---|
+| cracked asphalt, `garden_surfaces_1618` 0-20 s | crack in 100 % of frames, median 2,569 px, 268 3D points | 100 % of frames, 2,470 px (96 % kept), 298 3D points |
+| indoor tile, `corridor_book_1338_indoor` 0-25 s | 100 % of frames, median 12,708 px of grout, 1,537 3D points | median 423 px (97 % removed), 1 3D point |
+| tile and the door step, `garden_surfaces_1536` 0-28 s | median 1,792 px | median 71 px |
+
+About 60 % of tile frames still keep a short piece of grout (around 400 px). Training
+with our own tile frames as "no crack" examples is the real fix (`docs/crack_model.md`, step 6).
 
 ## Robot masks
 

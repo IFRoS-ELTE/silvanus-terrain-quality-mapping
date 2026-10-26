@@ -26,6 +26,10 @@ def generate_launch_description():
         'min_area': ('150.0', float),
         'min_length': ('1', int),
         'num_threads': ('2', int),
+        'drop_straight_lines': ('true', bool),
+        'straight_min_length_px': ('100', int),
+        'drop_step_edges': ('true', bool),
+        'step_edge_threshold_m': ('0.03', float),
     }
     arguments = [DeclareLaunchArgument(name, default_value=default)
                  for name, (default, _) in defaults.items()]
