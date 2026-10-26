@@ -47,12 +47,18 @@ Published by the lab stack. We only read them. Names exactly as in our bags.
 | `/ground/residual_cloud` | `sensor_msgs/PointCloud2` | depth node | RViz, Foxglove | exists, optional |
 | `/crack_detection/detections` | `std_msgs/String` (JSON) | crack node | fusion | exists |
 | `/crack_detection/debug_image` | `sensor_msgs/Image` | crack node | viewing | exists |
+| `/crack_detection/mask` | `sensor_msgs/Image` (mono8, 0/255) | crack node | fusion, viewing | exists |
+| `/crack_detection/points` | `sensor_msgs/PointCloud2` | crack node | fusion, RViz | exists |
+| `/crack_detection/markers` | `visualization_msgs/MarkerArray` | crack node | RViz | exists |
+| `/crack_detection/camera_info` | `sensor_msgs/CameraInfo` | crack node | viewing | exists |
 | `/ground/rgb_terrain` | `std_msgs/String` (JSON) | RGB terrain classifier | fusion | planned |
 | `/terrain/imu_roughness` | `std_msgs/Float32` | IMU roughness node | fusion, governor | planned |
 | `/terrain/imu_terrain` | `std_msgs/String` (JSON) | IMU terrain classifier | fusion | planned |
 | `/terrain/speed_limit` | `std_msgs/Float32` | fusion | governor | planned |
-| `/cmd_vel_teleop`, `/cmd_vel_nav` | `geometry_msgs/Twist` | teleop, Nav2 | `twist_mux` | planned |
-| `/cmd_vel` | `geometry_msgs/Twist` | governor | robot base | planned |
+| `/cmd_vel_in` | `geometry_msgs/Twist` | teleop, Nav2 | governor | exists |
+| `/cmd_vel` | `geometry_msgs/Twist` | governor | robot base | exists |
+| `/governor/state` | `std_msgs/String` (JSON) | governor | logging, viewing | exists |
+| `/governor/felt` | `std_msgs/String` (JSON) | governor | fusion | exists |
 
 ### `/ground/hazards`
 
@@ -83,17 +89,35 @@ Pixel boxes in the colour image, as JSON:
  "boxes": [{"x": 120, "y": 300, "width": 40, "height": 12, "area": 380, "score": 0.13}]}
 ```
 
-**Change needed:** the default input is `/camera/color/image_raw`. On the robot
-and in our bags it is `/camera/camera/color/image_raw`.
+Input `/camera/camera/color/image_raw`, the U-Net v1 with the colour robot mask;
+tile grout, painted lines and kerb or step edges are filtered out first
+(`src/crack_detection/README.md`). The crack pixels in 3D are on
+`/crack_detection/points`, in the depth frame. Merged into hazards, they go into
+`hazards.json` with type `crack` (`tools/analysis/hazard_map.py` does this offline).
 
-When cracks are projected to 3D later, they go into `hazards.json` with type
-`crack`; this topic stays as it is.
+### `/governor/state` and `/governor/felt`
+
+`navigation/speed_governor.py`. State, 20 Hz:
+
+```json
+{"mode": "slow", "limit": 0.2, "reason": "bump 44 mm (G2), until the rear wheels are past it", "command": 0.4, "out": 0.2}
+```
+
+`mode` is `free`, `slow` or `stop`. One `felt` message per hazard once the rear wheels
+are past it, with the IMU jolt and the class it earns:
+
+```json
+{"id": "G2", "type": "bump", "height_mm": 49, "x": 2.31, "y": -0.27, "imu_peak": 1.81, "felt": true, "class": "C"}
+```
 
 ### `/terrain/imu_roughness`
 
-RMS of vertical acceleration with gravity removed, over a 1 s window, in
-m/s². Published at 5 Hz. Indoor tile was about 0.23 and garden about 0.39 in
-the first bags.
+Power of the vertical free acceleration (`/filter/free_acceleration`, gravity
+already removed) at 8-50 Hz divided by the power at 0.5-8 Hz, over the last
+1.8 s (180 samples at 100 Hz). No unit. Published at 4 Hz, and only meaningful
+at 0.25-0.50 m/s. Medians over the 2026-10-08 runs: asphalt 2.2, red rubber
+path 0.51, wood chips 0.41, grass/dirt 0.29. The RMS planned at first only
+follows the speed (about 1.0 x speed on every surface), see docs/PROGRESS.md.
 
 ### `/ground/rgb_terrain` and `/terrain/imu_terrain`
 
@@ -131,10 +155,11 @@ runs/<bag name>/
 | `t` | s | ROS time |
 | `x`, `y` | m | robot position in `map` |
 | `speed` | m/s | from `/odom` |
-| `imu_roughness` | m/s² | latest `/terrain/imu_roughness` |
+| `imu_roughness` | ratio | latest `/terrain/imu_roughness`: power of vertical acceleration at 8-50 Hz over 0.5-8 Hz (plain RMS only follows speed, docs/PROGRESS.md section 3). `null` outside 0.25-0.50 m/s |
 | `camera_unevenness_mm` | mm | latest `/ground/unevenness` |
 | `terrain_camera`, `terrain_imu` | label | from the two classifiers, `null` if not running |
 | `hazards` | list | IDs of hazards seen in this stretch |
+| `surface_log` | label | offline only: the surface from the drive log in docs/DATA.md, for checking the classifiers |
 
 ### `hazards.json`
 
@@ -150,12 +175,12 @@ runs/<bag name>/
 | `id` | | `H1`, `H2` ... in the order first seen |
 | `type` | | `bump`, `hole` or `crack` |
 | `x`, `y` | m | position in `map` |
-| `length_mm`, `width_mm`, `height_mm` | mm | from the camera, at the closest sighting |
+| `length_mm`, `width_mm`, `height_mm` | mm | from the camera, at the closest sighting. Cracks: length and width of the crack on the ground, `height_mm` `null` |
 | `imu_peak` | m/s² | IMU spike when the wheels crossed it, `null` if not felt |
 | `crossing_speed` | m/s | speed at that moment, `null` if not crossed |
 | `class` | | `A` seen not felt, `B` felt not seen, `C` both |
 | `seen` | | number of frames it was detected in |
-| `crop` | | image file |
+| `crop` | | image file, `null` until crops are written |
 
 **Merging:** the same hazard appears in 10 to 30 frames as the robot
 approaches. Detections closer than 0.3 m are the same hazard. Average the

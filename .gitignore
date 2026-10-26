@@ -32,3 +32,4 @@ Thumbs.db
 bags/
 frames/
 *.txt.gz
+tools/inspection_viewer/runs/

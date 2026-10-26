@@ -21,13 +21,15 @@ The short version: **the camera predicts, the IMU confirms.**
 | 1 (1-7 Oct) | Depth hazard node running on the robot | Done, checked live and on bags |
 | 1 | IMU mounting measured, transform published | Done, IMU raised from 10 to 100 Hz |
 | 1 | First outdoor recordings with a surface log | Done, 5 outdoor runs with labelled surfaces |
-| 1 | Robot body and gripper mask | Done for depth; colour mask in progress |
+| 1 | Robot body and gripper mask | Done: depth mask, and the colour mask in the crack node |
 | 2 (8-14 Oct) | Outdoor localization tested | Done offline, wheel speed + IMU heading works best |
-| 2 | Crack model trained and released for the robot | Done, model v1 handed to the crack node |
+| 2 | Crack model trained and released for the robot | Done, model v1 running in the crack node on our recordings |
 | 2 | Indoor map with SLAM | Blocked: the lidar scan contains the floor (section 5) |
 | 2 | IMU roughness | The feature that separates surfaces is found; node not written yet |
 | 2 | RGB terrain classifier, annotation of our own frames | Started |
 | 3 (15-21 Oct) | Zigzag coverage sweep | Tool written; the simulator's skid steer turns too slowly to follow it yet |
+| 3 | Speed governor: slow down so the IMU can feel a hazard, stop before obstacles | Written and tested offline, not yet on the robot |
+| 3 | Camera and IMU fused, hazard classes A/B/C | Done offline on our recordings (section 6), live in the governor |
 
 Full plan to the end of November: [docs/MILESTONES.md](docs/MILESTONES.md).
 
@@ -126,7 +128,7 @@ The first crack node ran in simulation with a simple dark-pixel threshold:
   <img src="docs/images/sim_crack_boxes_1.jpeg" width="49%" alt="Crack boxes from the threshold node in RViz">
 </p>
 
-The threshold also boxes the robot's own bumper and wheels, which is why the U-Net and a robot mask replace it. Now in progress: running the U-Net on the cracked asphalt from our outdoor runs, a colour mask for the gripper, and fine-tuning on our own annotated frames. Model card and steps: [docs/crack_model.md](docs/crack_model.md). Training code: [vision_training/](vision_training/README.md).
+The threshold also boxed the robot's own bumper and wheels, so the node now runs the U-Net instead (Aritra, [src/crack_detection](src/crack_detection/README.md)): up to 5 frames a second on the robot's camera, with a colour mask for the gripper, and with the crack pixels put in 3D through the depth image. Replayed on our recordings it finds cracks in 100 % of the cracked-asphalt frames. It also marks tile grout and the edges of kerbs and door steps, so two filters drop long straight lines and crack pixels on a height step: 97 % of the tile grout goes, 96 % of the real crack pixels stay. Still to do: fine-tuning on our own annotated frames, with tile as "no crack" examples. Model card and steps: [docs/crack_model.md](docs/crack_model.md). Training code: [vision_training/](vision_training/README.md).
 
 ## 5. Where the robot is: localization
 
@@ -151,17 +153,29 @@ Same wheel speeds in both paths, only the heading differs. The figure is the off
 
 The fix is to raise the scan's minimum height to about +0.10 m indoors (+0.15 m outdoors) in the lab bring-up, and to record the 3D lidar so scans can be remade offline.
 
-## 6. Known problems
+## 6. Everything on one map
+
+All of it on one bag, offline: bumps and holes from depth, cracks from the U-Net, roughness along the path, all placed with the wheel + IMU position. Each hazard gets its class by checking whether the IMU jolted when a wheel crossed it.
+
+<p align="center">
+  <img src="docs/media/hazard_map_1447.png" width="95%" alt="Hazard map of the tape-measured indoor run">
+</p>
+
+On the tape-measured run the 50 mm foam block and a 15 mm wooden block are seen and felt (class C); the 20 mm foam strips are seen only (A), because foam squashes under the tyre. Outdoors the map shows the kerb, the raised edges of the red rubber path and the cracks on the asphalt: [hazard_map_1628.png](docs/media/hazard_map_1628.png). Details, fixes and limits: [docs/PROGRESS.md section 5](docs/PROGRESS.md#5-everything-on-one-map). Script: [tools/analysis/hazard_map.py](tools/analysis/hazard_map.py). For whoever fixes the ground, [tools/inspection_viewer](tools/inspection_viewer/README.md) shows the same run as one stitched photo of the driven strip, with the cracks on it and a work list.
+
+On the robot the same idea runs live in the speed governor ([navigation/](navigation/README.md#speed-governor)): it slows to 0.20 m/s before every hazard on the wheel track so the IMU can feel it, stops for anything of 10 cm or more right in front or a lidar obstacle 40 cm from the bumper, and reports each hazard as felt (C) or not (A) once the rear wheels are past.
+
+## 7. Known problems
 
 | Problem | Effect | Next step |
 |---|---|---|
 | The 2D scan contains the floor | SLAM and Nav2 unusable | Change `min_height` in the lab bring-up |
-| Fixed depth threshold outdoors | Tufts and leaves boxed as 12-19 mm bumps | Threshold that follows the surface's unevenness |
+| Fixed depth threshold outdoors | Tufts and leaves boxed as 12-19 mm bumps | Done: the threshold follows the surface's unevenness (section 6) |
 | D435 drops off USB | Happened 5 times on 8 October, after fast or rough driving | Secure the cable; reported to the lab |
 | Wheel odometry heading | 15-30° error per run | Fuse the IMU heading (EKF, ready) |
 | GNSS | ±7-10 m, no fix in 2 of 5 runs | Rough placement only |
 
-## 7. Next weeks
+## 8. Next weeks
 
 - **Week 3.** Fix the scan and build the indoor map; EKF live on the robot; IMU roughness node with the frequency-band feature; crack model on our outdoor runs; RGB terrain classifier v1 on the five labelled surfaces.
 - **Week 4.** More labelled outdoor runs (pavement, grass, gravel, dirt, slope) with repeats; map layer with the path coloured by roughness and hazard markers.
