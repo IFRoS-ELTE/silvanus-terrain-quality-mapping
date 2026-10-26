@@ -1,6 +1,6 @@
 # Progress
 
-Terrain quality and hazard mapping with Silvanus. State on 2026-10-08, against
+Terrain quality and hazard mapping with Silvanus. State on 2026-10-26, against
 the plan in [MILESTONES.md](MILESTONES.md). Data: [DATA.md](DATA.md).
 
 ---
@@ -14,8 +14,8 @@ the plan in [MILESTONES.md](MILESTONES.md). Data: [DATA.md](DATA.md).
 | Depth pipeline running as a ROS 2 node | ✅ `ground_demo/ground_hazard_node.py`, checked live and on bags |
 | `xsens_link` to `base_link` transform measured and published | ✅ [imu_mount.md](robot/imu_mount.md); IMU also raised from 10 to **100 Hz** |
 | First outdoor bag, with a surface log | ✅ 5 outdoor runs; surfaces labelled from the robot camera and phone video |
-| Crack model running on real frames | open; cracked asphalt is in `garden_surfaces_1548` and `_1618` |
-| Robot body and gripper mask | ✅ depth mask; the colour-image mask is open |
+| Crack model running on real frames | ✅ U-Net v1 in the ROS crack node (Aritra): cracks found in 100 % of the cracked-asphalt frames, section 5 |
+| Robot body and gripper mask | ✅ depth mask; colour mask in the crack node (Aritra, bottom 80 rows) |
 | Topic names and record schema agreed | draft in [schema.md](schema.md), not yet agreed |
 
 ### Week 2, 8-14 October
@@ -30,6 +30,16 @@ the plan in [MILESTONES.md](MILESTONES.md). Data: [DATA.md](DATA.md).
 | Annotation from our own bags | open |
 | **Gate:** robot drives to a goal on a saved map | not yet, needs the scan fixed first |
 | Week 3, started early: zigzag coverage sweep | tool written ([navigation/](../navigation/README.md)); in the lab simulator the skid-steer turns at less than half the commanded rate, so Nav2 cannot follow it yet |
+
+### Week 3, 15-21 October
+
+| Task | State |
+|---|---|
+| Speed governor between the velocity command and the base | ✅ written and tested offline ([navigation/](../navigation/README.md#speed-governor)), not yet on the robot |
+| Fusion: camera and IMU into one record every 0.25 m | ✅ offline (section 5), live node open |
+| Hazard classes A, B and C assigned and stored | ✅ offline (section 5) and live in the governor (`/governor/felt`) |
+| Boustrophedon sweep indoors | blocked by the scan, as above |
+| Vibration-based terrain classifier | open |
 
 ---
 
@@ -202,6 +212,24 @@ What was needed to get there:
 | Kerb and door edges marked as cracks | crack pixels on a height step are dropped |
 | One jolt credited to every tuft next to the wheel | one jolt goes to the tallest hazard the wheel crossed |
 
+**The crack node on the robot** ([src/crack_detection](../src/crack_detection/README.md), Aritra) runs
+the same U-Net live at up to 5 frames a second, with a colour mask for the gripper, and puts the
+crack pixels in 3D through the depth image. Replayed on our recordings it finds cracks in 100 % of
+the cracked-asphalt frames. The two false-crack filters from the map are now in the node as well:
+
+| recording | filters off | filters on |
+|---|---|---|
+| cracked asphalt (1618) | crack in 100 % of frames, 2,569 px | 100 % of frames, 2,470 px (96 % kept) |
+| indoor tile (1338) | 100 % of frames, 12,708 px of grout | 423 px (97 % removed) |
+| tile and the door step (1536) | 1,792 px | 71 px |
+
+**The speed governor** ([navigation/speed_governor.py](../navigation/README.md#speed-governor)) does
+the same classification live. It slows the robot to 0.20 m/s before every hazard on the wheel
+track, so the IMU can feel it. It stops for anything of 10 cm or more right in front, or a lidar
+return 40 cm from the bumper. Once the rear wheels are past a hazard, it reports whether the jolt
+made it class C or A. Replayed on the corridor run with a 0.4 m/s command, it slowed for the
+foam block and found it felt (1.81 m/s², C), the same as the map.
+
 For whoever has to fix things, [tools/inspection_viewer](../tools/inspection_viewer/README.md) shows
 the same run as an inspection map: the camera frames laid on the ground and stitched into one photo
 of the driven strip (5 mm per pixel), the cracks drawn on it, and a work list sorted by priority with
@@ -226,8 +254,8 @@ Limits of this first version:
 |---|---|---|
 | `/scan` contains the floor | SLAM and Nav2 unusable | change `min_height` in the lab bring-up |
 | Depth threshold outdoors | tufts and leaves on grass and wood chips boxed as 12-19 mm bumps | done: threshold follows the unevenness (section 5), also in the node (`rough_factor`) |
-| Crack model on tile | every grout line is a crack | straight-line filter in the map; the real fix is tile frames as negatives in the fine-tune |
-| Felt test | calibrated at 0.2 m/s only | speed-dependent threshold from more crossing runs |
+| Crack model on tile | every grout line is a crack | straight-line and step-edge filters, in the map and in the crack node; about 60 % of tile frames keep a short piece; the real fix is tile frames as negatives in the fine-tune |
+| Felt test | calibrated at 0.2 m/s on one run | more crossing runs at 0.2, 0.3 and 0.4 m/s, with the governor live |
 | D435 drops off USB | 5 times on 2026-10-08, after fast or rough driving | secure the cable; report to the lab |
 | Wheel odometry heading | 15-30 deg error per run | fuse IMU heading with `robot_localization` |
 | GNSS | +-7-10 m, no fix in 2 of 5 runs | use for rough placement only |
@@ -238,6 +266,6 @@ Limits of this first version:
 2. EKF live on the robot (config ready, tested offline), then Nav2 to a goal on the saved map.
 3. IMU roughness node with the frequency-band feature.
 4. Crack model fine-tuned on our frames with tile as negatives; terrain classifier on the outdoor bags.
-5. The hazard map live on the robot: the same chain as a node, with a speed-dependent felt test.
+5. The speed governor live on the robot (wheels up first), then the hazard map as a live node.
 
 Scripts for every figure: [tools/analysis](../tools/analysis/README.md).
