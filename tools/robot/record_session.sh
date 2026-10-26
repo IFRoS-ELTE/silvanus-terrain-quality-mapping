@@ -38,7 +38,8 @@ NEED=$(( DUR * RATE / 1000 + 2 ))
 if [ "$AVAIL" -lt "$NEED" ]; then echo "only ${AVAIL} GB free, need about ${NEED} GB - copy off and delete old bags"; exit 1; fi
 echo "${AVAIL} GB free in $BAGS_DIR"
 
-if ! sudo docker exec silvanus bash -c 'grep -qs "__node:=scan_fixed" /proc/[0-9]*/cmdline'; then
+# "scan_fixe[d]" so the check does not find its own command line, which also holds the name
+if ! sudo docker exec silvanus bash -c 'grep -qs "__node:=scan_fixe[d]" /proc/[0-9]*/cmdline'; then
     echo "starting /scan_fixed"
     sudo docker exec -d silvanus bash -c "$ROS && $SCAN_FIXED"
     sleep 5
