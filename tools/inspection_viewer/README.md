@@ -4,7 +4,8 @@ A page for the output of `tools/analysis/inspection_map.py`: the ground stitched
 camera, the cracks on it, every bump and hole, and a work list sorted by priority with a photo and
 the position along the route for each item.
 
-Make the runs (each takes 1-2 minutes; needs `vision_training/models/crack_unet16_v1.onnx`):
+To make the runs again, for example for a new bag (each takes 1-2 minutes; needs
+`vision_training/models/crack_unet16_v1.onnx`):
 
 ```bash
 source /opt/ros/jazzy/setup.bash
@@ -14,14 +15,13 @@ for b in garden_surfaces_1628 garden_surfaces_1548 corridor_groundtruth_1447; do
 done
 ```
 
-Open it (the page loads the run files, so it needs a local web server, not a double click):
+The three runs of 2026-10-08 (1628, 1548, 1447) are in `runs/`. Open the page with a local
+web server, because it loads the run files; a double click on index.html does not work:
 
 ```bash
 cd tools/inspection_viewer && python3 -m http.server 8000
 # then http://localhost:8000
 ```
-
-`runs/` is not in git (about 9 MB of images); make it again with the commands above.
 
 The same data in RViz, in 3D:
 
