@@ -48,6 +48,7 @@ K_ROUGH = float(os.environ.get("K_ROUGH", 3.0))   # threshold = max(15 mm, K_ROU
 WHEELS = [(0.249, 0.2915), (0.249, -0.2915), (-0.249, 0.2915), (-0.249, -0.2915)]   # scout_v2.xacro
 TYRE_HALF = 0.06          # half the tyre contact width, m
 MERGE_M = 0.30            # docs/schema.md: detections closer than this are one hazard
+DRIVE_V, DRIVE_W = 0.10, 0.30     # m/s forward and rad/s turn: a crossing is judged only while driving
 MIN_SEEN = 3              # a bump/hole seen in fewer frames is dropped as noise
 CELL = 0.05               # crack grid, m
 LARGE_MM, ROUGH_MM = 30, 5.0   # on ground rougher than 5 mm, bumps and holes under 30 mm are drawn faint: tufts, chips
@@ -117,7 +118,8 @@ def motion(bag, t_start, poses=None):
         tp = P["t"] - t_start
         px, py = np.interp(O[:, 0], tp, P["map_x"]), np.interp(O[:, 0], tp, P["map_y"])
         yaw = np.interp(O[:, 0], tp, np.unwrap(P["map_yaw"]))
-    path = dict(t=O[:, 0], v=O[:, 1], x=px, y=py, yaw=yaw, s=np.cumsum(np.abs(O[:, 1]) * dt))
+    w = ndimage.uniform_filter1d(np.gradient(np.unwrap(yaw), O[:, 0] + 1e-9 * np.arange(len(O))), 15)  # turn rate, about 0.5 s
+    path = dict(t=O[:, 0], v=O[:, 1], w=w, x=px, y=py, yaw=yaw, s=np.cumsum(np.abs(O[:, 1]) * dt))
 
     N, FS = 180, 100.0
     fr = np.fft.rfftfreq(N, 1 / FS); W = np.hanning(N); R = []
@@ -131,6 +133,13 @@ def motion(bag, t_start, poses=None):
     # jolt: vertical free acceleration minus its 0.5 s running median
     jolt = np.abs(F[:, 1] - ndimage.median_filter(F[:, 1], size=51, mode="nearest"))
     return path, np.array(R), np.stack([F[:, 0], jolt], 1)
+
+
+def driving(path, t):
+    """Driving forward, not turning on the spot: the only time a jolt says something about the ground.
+    A skid-steer robot turning on the spot scrubs its tyres and shakes by itself (2026-10-27: a 13 mm
+    "felt" bump from the 190 s the robot turned at a lane change)."""
+    return (np.interp(t, path["t"], path["v"]) >= DRIVE_V) & (np.abs(np.interp(t, path["t"], path["w"])) <= DRIVE_W)
 
 
 def pose_at(path, t):
@@ -337,6 +346,8 @@ def build(bag, use_cracks=True, poses=None):
         crossings = wheel_crossings(path, h)
         h["crossing_t"], h["imu_peak"], h["jolt_t"] = (crossings[0] if crossings else None), None, None
         for tc in crossings:
+            if not driving(path, tc):
+                continue
             peak, base, tj = jolt_at(J, tc)
             if felt(peak, base) and (h["imu_peak"] is None or peak > h["imu_peak"]):
                 h["imu_peak"], h["crossing_t"], h["jolt_t"] = peak, tc, tj
@@ -351,8 +362,7 @@ def build(bag, use_cracks=True, poses=None):
             continue
         h["class"] = "C"; explained.append(h["jolt_t"])
     # B: jolts that stand out while no seen hazard is under a wheel
-    moving = np.interp(J[:, 0], path["t"], np.abs(path["v"])) > 0.05
-    cand = (J[:, 1] > 0.5) & moving & (J[:, 1] == ndimage.maximum_filter1d(J[:, 1], 41))
+    cand = (J[:, 1] > 0.5) & driving(path, J[:, 0]) & (J[:, 1] == ndimage.maximum_filter1d(J[:, 1], 41))
     for t in J[cand, 0]:
         if any(abs(t - e) < 0.8 for e in explained):
             continue

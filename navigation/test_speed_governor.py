@@ -52,14 +52,18 @@ class NearestAheadTest(unittest.TestCase):
         return r
 
     def test_wall_straight_ahead(self):
-        self.assertAlmostEqual(nearest_ahead(self.scan_of([(0.85, 0.0)]), self.A), 0.38, places=2)
+        self.assertAlmostEqual(nearest_ahead(self.scan_of([(0.85, 0.0)]), self.A, front=0.47), 0.38, places=2)
+
+    def test_with_the_arm_out_the_camera_is_the_front(self):
+        # a wall 0.85 m ahead of the centre is already 0.2 m behind the camera's front
+        self.assertAlmostEqual(nearest_ahead(self.scan_of([(0.85, 0.0)]), self.A), 0.85 - 1.05, places=2)
 
     def test_corridor_wall_diagonally_beside_is_not_in_the_way(self):
         # 0.82 m ahead but 0.57 m to the side: the old +-35 deg window called this 0.35 m ahead
         self.assertEqual(nearest_ahead(self.scan_of([(0.82, 0.57), (0.82, -0.6)]), self.A), math.inf)
 
     def test_object_at_the_wheel(self):
-        self.assertLess(nearest_ahead(self.scan_of([(0.8, 0.4)]), self.A), 0.40)
+        self.assertLess(nearest_ahead(self.scan_of([(0.8, 0.4)]), self.A, front=0.47), 0.40)
 
 
 class CreditJoltTest(unittest.TestCase):

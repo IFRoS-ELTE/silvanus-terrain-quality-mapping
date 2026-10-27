@@ -48,6 +48,7 @@ sudo docker exec -it silvanus bash -c "source /opt/ros/jazzy/setup.bash && sourc
 ./record_session.sh garden_surfaces 90   # corrected scan, 12 s check of every topic, then 90 s recording
 bash governor_up.sh 0.5     # depth hazard node + speed governor + /scan_fixed; teleop on /cmd_vel_in
 LENGTH=5 WIDTH=5 bash auto_session.sh hall dry   # live map, turn, plan the lanes, print them
+                            # start with 1.25 m free all round: the arm's camera reaches 1.05 m ahead
 LENGTH=5 WIDTH=5 bash auto_session.sh hall       # ... and sweep them, recorded, live page on :8000
 ```
 

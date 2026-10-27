@@ -11,7 +11,8 @@ Sits between whatever drives the robot (teleop, Nav2) and the base:
 
 What it does with the forward speed (turning and reversing always pass):
   stop   a bump or hole of stop_height_m or more on the robot's track, within stop_distance_m
-         of the front wheels, or a lidar return within stop_range_m of the front bumper
+         of the front wheels, or a lidar return within stop_range_m of the robot's front: the
+         camera on the arm in Pose B (front_m 1.05 m from the centre), the bumper with the arm tucked
   slow   any other hazard from the depth node on the track ahead, until the rear wheels have
          passed it: confirm_speed (0.20 m/s). On the 2026-10-08 runs the IMU felt rigid
          objects from 15 mm at 0.2-0.3 m/s, while above 0.4 m/s the robot's own shaking on
@@ -47,6 +48,7 @@ from vision_msgs.msg import Detection3DArray
 
 FRONT_AXLE, REAR_AXLE = 0.249, -0.249          # scout_v2.xacro wheelbase 0.498 m
 BUMPER = 0.47                                   # front bumper ahead of the robot centre, m
+ARM_FRONT = 1.05                                # camera housing in Pose B ahead of the centre (camera at 0.94 m)
 TRACK_HALF = 0.2915 + 0.06 + 0.10               # half track + half tyre + margin: what the wheels can touch
 BODY_HALF, BODY_REAR = 0.36, -0.50               # outline of the robot itself (footprint +-0.325 m, wheels to 0.35)
 PART_OF_M = 0.6          # hazards closer than this that share one jolt are one object (2026-10-27: plates as 2-3 pieces)
@@ -80,14 +82,16 @@ def limit_command(v, w, limit):
     return limit, w * limit / v
 
 
-def nearest_ahead(ranges, angles, range_min=0.0):
-    """Distance from the bumper to the nearest lidar return in the robot's own lane ahead (scan in
-    base_footprint): only points within TRACK_HALF to either side count. A wall diagonally ahead and
+def nearest_ahead(ranges, angles, range_min=0.0, front=ARM_FRONT):
+    """Distance from the robot's front (the arm's camera in Pose B, or the bumper) to the nearest lidar
+    return in the robot's own lane ahead (scan in base_footprint): only points within TRACK_HALF to
+    either side count. Measured from the bumper, a stop at 0.40 m left the camera 7 cm past the stop
+    line (2026-10-27). A wall diagonally ahead and
     beside the robot is not in its way; counting everything within +-35 deg stopped it in corridors
     (simulation, 2026-10-27)."""
     ok = np.isfinite(ranges) & (ranges >= range_min)
     x, y = ranges[ok] * np.cos(angles[ok]), ranges[ok] * np.sin(angles[ok])
-    ahead = x[(x > BUMPER) & (np.abs(y) < TRACK_HALF)] - BUMPER
+    ahead = x[(x > BUMPER) & (np.abs(y) < TRACK_HALF)] - front
     return float(ahead.min()) if len(ahead) else math.inf
 
 
@@ -111,7 +115,7 @@ def decide(hazards, scan_min, p):
     """Speed limit for the hazards around the robot, in the robot frame (x forward from the centre, y left).
 
     hazards: dicts with name, h (height or depth, m), bx, by (centre, m), half_len (m).
-    scan_min: nearest lidar return in front of the bumper, m. Returns (limit, mode, reason).
+    scan_min: nearest lidar return in front of the robot (arm or bumper), m. Returns (limit, mode, reason).
     """
     limit, mode, why = p["max_speed"], "free", ""
     for hz in hazards:
@@ -123,7 +127,7 @@ def decide(hazards, scan_min, p):
         if hz["bx"] - FRONT_AXLE < p["slow_ahead_m"] and limit > p["confirm_speed"]:
             limit, mode, why = p["confirm_speed"], "slow", f"{hz['name']}, until the rear wheels are past it"
     if scan_min < p["stop_range_m"]:
-        return 0.0, "stop", f"obstacle {scan_min:.2f} m in front of the bumper (lidar)"
+        return 0.0, "stop", f"obstacle {scan_min:.2f} m in front of the robot (lidar)"
     return limit, mode, why
 
 
@@ -132,7 +136,7 @@ class SpeedGovernor(Node):
         super().__init__("speed_governor")
         defaults = dict(enable=False, input_topic="/cmd_vel_in", output_topic="/cmd_vel", scan_topic="/scan_fixed",
                         max_speed=0.5, confirm_speed=0.20, stop_height_m=0.10, stop_distance_m=0.35,
-                        stop_range_m=0.40, slow_ahead_m=1.6, input_timeout_s=0.5,
+                        stop_range_m=0.15, front_m=ARM_FRONT, slow_ahead_m=1.6, input_timeout_s=0.5,
                         odom_frame="odom", base_frame="base_footprint", merge_m=0.3)
         for k, v in defaults.items():
             self.declare_parameter(k, v)
@@ -140,6 +144,7 @@ class SpeedGovernor(Node):
         self.tf = Buffer(); TransformListener(self.tf, self)
         self.hazards = []                 # tracked in odom: dict(x, y, h, kind, ...)
         self.cmd, self.cmd_time = Twist(), None
+        self.last_out = (0.0, 0.0)
         self.scan_min, self.jolt = math.inf, deque(maxlen=1500)   # 15 s at 100 Hz: (t, |a - median|)
         self.az = deque(maxlen=51)
         self.used_jolts = []              # one jolt confirms one hazard: wheels crossing two tufts feel one bump
@@ -158,7 +163,7 @@ class SpeedGovernor(Node):
             "enable is false: /cmd_vel is NOT published, only /governor/state. Re-run with -p enable:=true "
             "with an operator at the e-stop." if not self.p["enable"] else
             f"Driving {self.p['input_topic']} -> {self.p['output_topic']}: slow to {self.p['confirm_speed']} m/s "
-            f"at hazards, stop at {self.p['stop_height_m'] * 1000:.0f} mm or {self.p['stop_range_m']} m from the bumper")
+            f"at hazards, stop at {self.p['stop_height_m'] * 1000:.0f} mm or {self.p['stop_range_m']} m from the front ({self.p['front_m']} m ahead of the centre)")
 
     # ---- inputs
     def on_cmd(self, msg):
@@ -166,7 +171,7 @@ class SpeedGovernor(Node):
 
     def on_scan(self, msg):
         a = msg.angle_min + np.arange(len(msg.ranges)) * msg.angle_increment
-        self.scan_min = nearest_ahead(np.asarray(msg.ranges, dtype=float), a, msg.range_min)
+        self.scan_min = nearest_ahead(np.asarray(msg.ranges, dtype=float), a, msg.range_min, self.p["front_m"])
 
     def on_acc(self, msg):
         t = Time.from_msg(msg.header.stamp).nanoseconds * 1e-9
@@ -237,7 +242,9 @@ class SpeedGovernor(Node):
                     self.finish(hz)
                     continue
                 on_track = abs(by) <= TRACK_HALF + half_len
-                if on_track and (abs(bx - FRONT_AXLE) < half_len + 0.15 or abs(bx - REAR_AXLE) < half_len + 0.15):
+                driving = self.last_out[0] >= 0.10 and abs(self.last_out[1]) <= 0.30   # not turning on the spot:
+                # a skid-steer robot scrubbing its tyres shakes by itself (tools/analysis/hazard_map.driving)
+                if on_track and driving and (abs(bx - FRONT_AXLE) < half_len + 0.15 or abs(bx - REAR_AXLE) < half_len + 0.15):
                     hz["crossing"] = (hz["crossing"] or (t, t))[0], t
                 ahead.append(dict(name=f"{hz['kind']} {hz['h'] * 1000:.0f} mm ({hz['id']})", h=hz["h"],
                                   bx=bx, by=by, half_len=half_len))
@@ -251,6 +258,7 @@ class SpeedGovernor(Node):
         self.pub_state.publish(String(data=json.dumps({"mode": mode, "limit": limit, "reason": why,
                                                        "command": round(self.cmd.linear.x, 2) if fresh else None,
                                                        "out": round(out.linear.x, 2)})))
+        self.last_out = (out.linear.x, out.angular.z)
         if self.pub_cmd is not None and (fresh or self.cmd_time is not None):
             self.pub_cmd.publish(out)                    # zeros once the input stops: never keep the last speed
 

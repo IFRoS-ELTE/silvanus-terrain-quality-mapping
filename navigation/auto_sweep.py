@@ -3,7 +3,8 @@
 
 Needs live SLAM (map -> odom, /map) and Nav2 running, and the robot standing where the sweep should
 start, facing the area. Then:
-  1. it turns once on the spot, so the lidar maps everything around it
+  1. it turns once on the spot, so the lidar maps everything around it (only with 1.25 m free all
+     round: the arm's camera reaches 1.05 m ahead)
   2. it fits lanes into the free floor of the live map, up to --length m ahead and --width m across
      (navigation/lane_planner.py: at least 0.6 m from walls and unknown space)
   3. it drives them through Nav2 (FollowWaypoints, every corner facing the next leg)
@@ -71,6 +72,13 @@ def main():
     start = robot_pose(nav, buf)
 
     if not a.no_spin:
+        m0 = grid["m"]
+        g0 = np.array(m0.data, dtype=np.int16).reshape(m0.info.height, m0.info.width)
+        near = lp.nearest_obstacle(g0, m0.info.resolution, (m0.info.origin.position.x, m0.info.origin.position.y), start[:2])
+        if near < lp.TURN_CLEARANCE:
+            log.error(f"something {near:.2f} m from the robot centre: turning on the spot with the arm out needs "
+                      f"{lp.TURN_CLEARANCE} m all round. Move the robot to open floor, or use --no-spin.")
+            sys.exit(1)
         log.info("turning once on the spot to map the surroundings")
         nav.spin(spin_dist=2 * math.pi, time_allowance=90)
         while not nav.isTaskComplete():

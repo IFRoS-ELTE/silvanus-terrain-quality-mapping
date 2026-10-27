@@ -2,227 +2,228 @@
  "run": "corridor_sweep_1829",
  "length_m": 14.0,
  "m_per_px": 0.005,
- "width_px": 2054,
- "height_px": 1499,
+ "width_px": 2034,
+ "height_px": 1400,
  "origin": {
-  "x0": -10.781,
-  "y1": 4.657
+  "x0": -10.767,
+  "y1": 4.786
  },
+ "rotation_deg": 1.06,
  "map": "map.png",
  "positions": "SLAM (lidar)",
  "path": [
   [
-   1694,
-   645,
+   1696,
+   662,
    3.8,
    null,
    "free"
   ],
   [
-   1662,
-   659,
+   1664,
+   675,
    3.9,
    null,
    "free"
   ],
   [
-   1622,
-   673,
-   3.8,
-   null,
-   "free"
-  ],
-  [
-   1598,
+   1624,
    689,
    3.8,
    null,
    "free"
   ],
   [
-   1566,
-   699,
-   4.0,
-   null,
-   "free"
-  ],
-  [
-   1536,
-   703,
-   4.0,
-   null,
-   "free"
-  ],
-  [
-   1504,
-   703,
+   1600,
+   704,
    3.8,
    null,
    "free"
   ],
   [
-   1468,
-   701,
-   3.7,
+   1567,
+   714,
+   4.0,
    null,
    "free"
   ],
   [
-   1430,
-   695,
-   3.7,
+   1537,
+   717,
+   4.0,
    null,
    "free"
   ],
   [
-   1384,
-   685,
+   1505,
+   717,
    3.8,
    null,
    "free"
   ],
   [
-   1338,
+   1469,
+   714,
+   3.7,
+   null,
+   "free"
+  ],
+  [
+   1431,
+   707,
+   3.7,
+   null,
+   "free"
+  ],
+  [
+   1386,
+   696,
+   3.8,
+   null,
+   "free"
+  ],
+  [
+   1340,
+   683,
+   4.0,
+   null,
+   "free"
+  ],
+  [
+   1296,
    673,
    4.0,
    null,
    "free"
   ],
   [
-   1294,
-   663,
+   1252,
+   666,
    4.0,
    null,
    "free"
   ],
   [
-   1250,
+   1204,
+   675,
+   3.9,
+   null,
+   "free"
+  ],
+  [
+   1158,
+   688,
+   3.9,
+   null,
+   "free"
+  ],
+  [
+   1112,
+   697,
+   3.8,
+   null,
+   "free"
+  ],
+  [
+   1065,
+   702,
+   3.9,
+   null,
+   "free"
+  ],
+  [
+   1017,
+   703,
+   4.0,
+   null,
+   "free"
+  ],
+  [
+   974,
+   695,
+   4.1,
+   null,
+   "free"
+  ],
+  [
+   928,
+   678,
+   4.2,
+   null,
+   "free"
+  ],
+  [
+   892,
    657,
    4.0,
    null,
    "free"
   ],
   [
-   1202,
-   667,
-   3.9,
-   null,
-   "free"
-  ],
-  [
-   1156,
-   681,
-   3.9,
-   null,
-   "free"
-  ],
-  [
-   1110,
-   691,
-   3.8,
-   null,
-   "free"
-  ],
-  [
-   1064,
-   697,
-   3.9,
-   null,
-   "free"
-  ],
-  [
-   1016,
-   699,
-   4.0,
-   null,
-   "free"
-  ],
-  [
-   972,
-   691,
-   4.1,
-   null,
-   "free"
-  ],
-  [
-   926,
-   675,
-   4.2,
-   null,
-   "free"
-  ],
-  [
-   890,
-   655,
-   4.0,
-   null,
-   "free"
-  ],
-  [
-   844,
-   637,
+   847,
+   638,
    3.7,
    null,
    "free"
   ],
   [
-   806,
-   619,
+   809,
+   620,
    3.8,
    null,
    "free"
   ],
   [
-   782,
+   785,
    603,
    4.0,
    null,
    "free"
   ],
   [
-   724,
-   587,
+   728,
+   586,
    4.0,
    null,
    "free"
   ],
   [
-   690,
-   621,
-   4.0,
-   null,
-   "slow"
-  ],
-  [
-   680,
-   681,
-   3.9,
-   null,
-   "free"
-  ],
-  [
-   710,
-   721,
-   3.9,
-   null,
-   "free"
-  ],
-  [
-   706,
-   719,
+   693,
+   619,
    4.0,
    null,
    "slow"
   ],
   [
-   742,
-   731,
+   682,
+   679,
    3.9,
    null,
    "free"
   ],
   [
-   786,
+   711,
+   720,
+   3.9,
+   null,
+   "free"
+  ],
+  [
+   707,
+   718,
+   4.0,
+   null,
+   "slow"
+  ],
+  [
+   743,
+   730,
+   3.9,
+   null,
+   "free"
+  ],
+  [
+   787,
    743,
    3.9,
    null,
@@ -230,174 +231,174 @@
   ],
   [
    834,
-   755,
+   756,
    3.8,
    null,
    "free"
   ],
   [
    880,
-   767,
+   769,
    4.0,
    null,
    "free"
   ],
   [
    926,
-   781,
+   784,
    4.0,
    null,
    "free"
   ],
   [
    974,
-   797,
+   801,
    4.0,
    null,
    "free"
   ],
   [
    880,
-   785,
+   787,
    4.0,
    null,
    "free"
   ],
   [
-   854,
-   739,
+   855,
+   740,
    4.1,
    null,
    "slow"
   ],
   [
-   828,
-   697,
+   830,
+   698,
    4.0,
    null,
    "slow"
   ],
   [
-   800,
+   802,
    657,
    3.8,
    null,
    "slow"
   ],
   [
-   764,
+   767,
    639,
    3.8,
    null,
    "slow"
   ],
   [
-   720,
-   653,
+   722,
+   652,
    3.9,
    null,
    "slow"
   ],
   [
-   688,
-   679,
+   690,
+   677,
    4.0,
    null,
    "slow"
   ],
   [
-   652,
-   719,
+   653,
+   717,
    4.0,
    null,
    "slow"
   ],
   [
    646,
-   775,
-   4.0,
-   null,
-   "free"
-  ],
-  [
-   726,
-   733,
-   4.1,
-   null,
-   "free"
-  ],
-  [
-   768,
-   723,
-   4.0,
-   null,
-   "free"
-  ],
-  [
-   808,
-   709,
-   3.9,
-   null,
-   "free"
-  ],
-  [
-   862,
-   697,
-   4.0,
-   null,
-   "free"
-  ],
-  [
-   910,
-   693,
-   3.9,
-   null,
-   "free"
-  ],
-  [
-   962,
-   701,
-   4.0,
-   null,
-   "free"
-  ],
-  [
-   1004,
-   715,
-   4.0,
-   null,
-   "free"
-  ],
-  [
-   1048,
-   733,
-   4.0,
-   null,
-   "free"
-  ],
-  [
-   1088,
-   751,
-   4.1,
-   null,
-   "free"
-  ],
-  [
-   1132,
    773,
    4.0,
    null,
    "free"
   ],
   [
+   727,
+   732,
+   4.1,
+   null,
+   "free"
+  ],
+  [
+   769,
+   723,
+   4.0,
+   null,
+   "free"
+  ],
+  [
+   809,
+   710,
+   3.9,
+   null,
+   "free"
+  ],
+  [
+   864,
+   699,
+   4.0,
+   null,
+   "free"
+  ],
+  [
+   912,
+   696,
+   3.9,
+   null,
+   "free"
+  ],
+  [
+   963,
+   704,
+   4.0,
+   null,
+   "free"
+  ],
+  [
+   1005,
+   719,
+   4.0,
+   null,
+   "free"
+  ],
+  [
+   1049,
+   738,
+   4.0,
+   null,
+   "free"
+  ],
+  [
+   1088,
+   757,
+   4.1,
+   null,
+   "free"
+  ],
+  [
+   1132,
+   780,
+   4.0,
+   null,
+   "free"
+  ],
+  [
    1182,
-   795,
+   803,
    3.9,
    null,
    "free"
   ]
  ],
- "crack_length_m": 4.8,
+ "crack_length_m": 0.0,
  "hazards": [
   {
    "id": "H1",
@@ -412,7 +413,7 @@
    "class": "C",
    "seen": 5,
    "crop": null,
-   "px": 762,
+   "px": 767,
    "py": 528,
    "route_m": 5.7,
    "offset_m": -0.32,
@@ -435,8 +436,8 @@
    "class": "A",
    "seen": 3,
    "crop": null,
-   "px": 519,
-   "py": 350,
+   "px": 527,
+   "py": 346,
    "route_m": 6.1,
    "offset_m": -1.37,
    "side": "right",
@@ -458,8 +459,8 @@
    "class": "A",
    "seen": 3,
    "crop": null,
-   "px": 890,
-   "py": 630,
+   "px": 894,
+   "py": 632,
    "route_m": 5.0,
    "offset_m": -0.12,
    "side": "on the path",
@@ -467,441 +468,6 @@
    "rough_ground": false,
    "priority": "low",
    "note": "only seen at the side, where the colour camera does not reach"
-  },
-  {
-   "id": "H4",
-   "type": "crack",
-   "x": -8.21,
-   "y": 2.6,
-   "length_mm": 223,
-   "width_mm": 150,
-   "height_mm": null,
-   "imu_peak": null,
-   "crossing_speed": null,
-   "class": "A",
-   "seen": 7,
-   "crop": "crops/H4.jpg",
-   "px": 513,
-   "py": 412,
-   "route_m": 6.1,
-   "offset_m": -1.09,
-   "side": "right",
-   "surface": null,
-   "rough_ground": false,
-   "priority": "low",
-   "note": null,
-   "box_px": [
-    501,
-    406,
-    521,
-    416
-   ]
-  },
-  {
-   "id": "H5",
-   "type": "crack",
-   "x": -8.05,
-   "y": 1.58,
-   "length_mm": 237,
-   "width_mm": 121,
-   "height_mm": null,
-   "imu_peak": null,
-   "crossing_speed": null,
-   "class": "A",
-   "seen": 11,
-   "crop": "crops/H5.jpg",
-   "px": 546,
-   "py": 616,
-   "route_m": 11.4,
-   "offset_m": -0.66,
-   "side": "right",
-   "surface": null,
-   "rough_ground": false,
-   "priority": "low",
-   "note": null,
-   "box_px": [
-    541,
-    606,
-    551,
-    626
-   ]
-  },
-  {
-   "id": "H6",
-   "type": "crack",
-   "x": -7.76,
-   "y": 2.42,
-   "length_mm": 223,
-   "width_mm": 150,
-   "height_mm": null,
-   "imu_peak": null,
-   "crossing_speed": null,
-   "class": "A",
-   "seen": 12,
-   "crop": "crops/H6.jpg",
-   "px": 605,
-   "py": 448,
-   "route_m": 6.1,
-   "offset_m": -0.77,
-   "side": "right",
-   "surface": null,
-   "rough_ground": false,
-   "priority": "low",
-   "note": null,
-   "box_px": [
-    601,
-    436,
-    611,
-    456
-   ]
-  },
-  {
-   "id": "H7",
-   "type": "crack",
-   "x": -7.12,
-   "y": 2.29,
-   "length_mm": 320,
-   "width_mm": 146,
-   "height_mm": null,
-   "imu_peak": null,
-   "crossing_speed": null,
-   "class": "A",
-   "seen": 8,
-   "crop": "crops/H7.jpg",
-   "px": 732,
-   "py": 473,
-   "route_m": 6.0,
-   "offset_m": -0.55,
-   "side": "right",
-   "surface": null,
-   "rough_ground": false,
-   "priority": "low",
-   "note": null,
-   "box_px": [
-    711,
-    466,
-    751,
-    476
-   ]
-  },
-  {
-   "id": "H8",
-   "type": "crack",
-   "x": -6.88,
-   "y": 0.33,
-   "length_mm": 250,
-   "width_mm": 165,
-   "height_mm": null,
-   "imu_peak": null,
-   "crossing_speed": null,
-   "class": "A",
-   "seen": 152,
-   "crop": "crops/H8.jpg",
-   "px": 781,
-   "py": 866,
-   "route_m": 7.8,
-   "offset_m": -0.6,
-   "side": "right",
-   "surface": null,
-   "rough_ground": false,
-   "priority": "low",
-   "note": null,
-   "box_px": [
-    771,
-    856,
-    791,
-    876
-   ]
-  },
-  {
-   "id": "H9",
-   "type": "crack",
-   "x": -6.63,
-   "y": 0.51,
-   "length_mm": 428,
-   "width_mm": 179,
-   "height_mm": null,
-   "imu_peak": null,
-   "crossing_speed": null,
-   "class": "A",
-   "seen": 77,
-   "crop": "crops/H9.jpg",
-   "px": 830,
-   "py": 828,
-   "route_m": 9.5,
-   "offset_m": 0.3,
-   "side": "left",
-   "surface": null,
-   "rough_ground": false,
-   "priority": "medium",
-   "note": null,
-   "box_px": [
-    821,
-    796,
-    841,
-    856
-   ]
-  },
-  {
-   "id": "H10",
-   "type": "crack",
-   "x": -6.5,
-   "y": 1.43,
-   "length_mm": 415,
-   "width_mm": 255,
-   "height_mm": null,
-   "imu_peak": null,
-   "crossing_speed": null,
-   "class": "A",
-   "seen": 78,
-   "crop": "crops/H10.jpg",
-   "px": 856,
-   "py": 646,
-   "route_m": 5.1,
-   "offset_m": 0.02,
-   "side": "on the path",
-   "surface": null,
-   "rough_ground": false,
-   "priority": "medium",
-   "note": null,
-   "box_px": [
-    831,
-    626,
-    881,
-    666
-   ]
-  },
-  {
-   "id": "H11",
-   "type": "crack",
-   "x": -6.42,
-   "y": 1.07,
-   "length_mm": 235,
-   "width_mm": 196,
-   "height_mm": null,
-   "imu_peak": null,
-   "crossing_speed": null,
-   "class": "A",
-   "seen": 91,
-   "crop": "crops/H11.jpg",
-   "px": 872,
-   "py": 717,
-   "route_m": 13.2,
-   "offset_m": -0.1,
-   "side": "on the path",
-   "surface": null,
-   "rough_ground": false,
-   "priority": "low",
-   "note": null,
-   "box_px": [
-    861,
-    706,
-    881,
-    726
-   ]
-  },
-  {
-   "id": "H12",
-   "type": "crack",
-   "x": -6.07,
-   "y": 0.58,
-   "length_mm": 409,
-   "width_mm": 187,
-   "height_mm": null,
-   "imu_peak": null,
-   "crossing_speed": null,
-   "class": "A",
-   "seen": 23,
-   "crop": "crops/H12.jpg",
-   "px": 942,
-   "py": 814,
-   "route_m": 9.1,
-   "offset_m": 0.02,
-   "side": "on the path",
-   "surface": null,
-   "rough_ground": false,
-   "priority": "medium",
-   "note": null,
-   "box_px": [
-    921,
-    786,
-    951,
-    836
-   ]
-  },
-  {
-   "id": "H13",
-   "type": "crack",
-   "x": -5.97,
-   "y": 1.2,
-   "length_mm": 393,
-   "width_mm": 145,
-   "height_mm": null,
-   "imu_peak": null,
-   "crossing_speed": null,
-   "class": "A",
-   "seen": 67,
-   "crop": "crops/H13.jpg",
-   "px": 961,
-   "py": 691,
-   "route_m": 4.5,
-   "offset_m": 0.01,
-   "side": "on the path",
-   "surface": null,
-   "rough_ground": false,
-   "priority": "low",
-   "note": null,
-   "box_px": [
-    951,
-    666,
-    971,
-    716
-   ]
-  },
-  {
-   "id": "H14",
-   "type": "crack",
-   "x": -5.85,
-   "y": 0.69,
-   "length_mm": 487,
-   "width_mm": 111,
-   "height_mm": null,
-   "imu_peak": null,
-   "crossing_speed": null,
-   "class": "A",
-   "seen": 9,
-   "crop": "crops/H14.jpg",
-   "px": 985,
-   "py": 793,
-   "route_m": 8.7,
-   "offset_m": 0.04,
-   "side": "on the path",
-   "surface": null,
-   "rough_ground": false,
-   "priority": "medium",
-   "note": null,
-   "box_px": [
-    971,
-    766,
-    1001,
-    816
-   ]
-  },
-  {
-   "id": "H15",
-   "type": "crack",
-   "x": -5.53,
-   "y": 1.95,
-   "length_mm": 237,
-   "width_mm": 121,
-   "height_mm": null,
-   "imu_peak": null,
-   "crossing_speed": null,
-   "class": "A",
-   "seen": 5,
-   "crop": "crops/H15.jpg",
-   "px": 1051,
-   "py": 541,
-   "route_m": 4.0,
-   "offset_m": -0.78,
-   "side": "right",
-   "surface": null,
-   "rough_ground": false,
-   "priority": "low",
-   "note": null,
-   "box_px": [
-    1041,
-    536,
-    1061,
-    546
-   ]
-  },
-  {
-   "id": "H16",
-   "type": "crack",
-   "x": -5.18,
-   "y": 1.03,
-   "length_mm": 347,
-   "width_mm": 141,
-   "height_mm": null,
-   "imu_peak": null,
-   "crossing_speed": null,
-   "class": "A",
-   "seen": 13,
-   "crop": "crops/H16.jpg",
-   "px": 1119,
-   "py": 726,
-   "route_m": 3.8,
-   "offset_m": 0.18,
-   "side": "left",
-   "surface": null,
-   "rough_ground": false,
-   "priority": "low",
-   "note": null,
-   "box_px": [
-    1111,
-    706,
-    1131,
-    746
-   ]
-  },
-  {
-   "id": "H17",
-   "type": "crack",
-   "x": -3.29,
-   "y": 1.07,
-   "length_mm": 274,
-   "width_mm": 127,
-   "height_mm": null,
-   "imu_peak": null,
-   "crossing_speed": null,
-   "class": "A",
-   "seen": 16,
-   "crop": "crops/H17.jpg",
-   "px": 1499,
-   "py": 718,
-   "route_m": 1.6,
-   "offset_m": 0.07,
-   "side": "on the path",
-   "surface": null,
-   "rough_ground": false,
-   "priority": "low",
-   "note": null,
-   "box_px": [
-    1491,
-    706,
-    1511,
-    726
-   ]
-  },
-  {
-   "id": "H18",
-   "type": "crack",
-   "x": -2.8,
-   "y": 1.86,
-   "length_mm": 351,
-   "width_mm": 147,
-   "height_mm": null,
-   "imu_peak": null,
-   "crossing_speed": null,
-   "class": "A",
-   "seen": 16,
-   "crop": "crops/H18.jpg",
-   "px": 1596,
-   "py": 558,
-   "route_m": 0.6,
-   "offset_m": -0.56,
-   "side": "right",
-   "surface": null,
-   "rough_ground": false,
-   "priority": "low",
-   "note": null,
-   "box_px": [
-    1581,
-    546,
-    1611,
-    576
-   ]
   }
  ],
  "rules": {

@@ -24,7 +24,7 @@ L=~/workspaces/scout_xarm_ros2/src/scout_xarm_navigation/config/nav2_params.yaml
 python3 make_nav2_robot.py $L nav2_robot.yaml --max-speed 0.2 --initial-pose 3.037 -3.203 66.34
 # sweeps: through the speed governor, Pure Pursuit, looser goal check
 python3 make_nav2_robot.py $L nav2_robot_governor.yaml --max-speed 0.35 --initial-pose 3.037 -3.203 66.34 \
-    --cmd-vel-out cmd_vel_in --goal-tolerance 0.35 30 --controller rpp
+    --cmd-vel-out cmd_vel_in --goal-tolerance 0.35 30 --controller rpp --arm-footprint
 ```
 
 The initial pose is the start tape of the `indoor_loop3_1316` map. For sweeps three things differ from
@@ -37,6 +37,11 @@ the lab's settings, each found on the first sweep on 2026-10-27, where the robot
 - every corner faces the next leg (`coverage_sweep.lanes`, `lane_planner.plan`): turn on the spot,
   drive straight, turn. Facing along the lane, the next lane start sat beside the robot.
 
+`--arm-footprint` adds the arm in Pose B to the robot's outline: the camera housing is 1.05 m ahead of
+the centre, so turning on the spot sweeps a circle of about 1 m, and the costmaps, the controller and the
+collision monitor check it like the body. The lidar band is 0.1-0.6 m: walls and people are seen, a
+table top at arm height is not.
+
 ## Sweeps
 
 On a saved map, with a rectangle in its frame (`--yaw` turns it, e.g. along a corridor):
@@ -46,9 +51,11 @@ python3 coverage_sweep.py --x0 3.875 --y0 -0.294 --yaw 66.34 --length 5 --width 
 ```
 
 Autonomous, with live SLAM and no saved map. The robot stands where the sweep should start, facing
-the area; it turns once on the spot, fits lanes 0.8 m apart into the free floor it has mapped (at
-least 0.6 m from walls and unknown space, each lane cut to its longest free stretch, shorter than 1 m
-dropped), up to the area it is given, and sweeps them:
+the area, with 1.25 m free all round (it refuses to turn otherwise); it turns once on the spot, fits
+lanes 0.8 m apart into the free floor it has mapped and sweeps them. A lane keeps 0.6 m from walls and
+unknown space along its length; its ends, where the robot turns with the arm out, need 1.25 m free all
+round and are pulled in until they have it; lanes shorter than 1 m are dropped, and the pattern is shifted
+sideways if that fits more. `sweep_session.sh` plans the same way on the saved map (`--no-spin`):
 
 ```bash
 python3 auto_sweep.py --length 5 --width 5          # --dry: turn and plan only
@@ -60,9 +67,9 @@ lab's `false` SLAM Toolbox waits for 9 cm of travel and the turn on the spot map
 and after a full turn in simulation, 70 m² with `true`).
 
 Tested in simulation (`fake_robot.py` on the `indoor_loop3_1316` map, 5 % turn error on the wheels):
-the corridor sweep of 3 lanes x 5 m in 78 s, and the autonomous one from the start tape with a 5 x 5 m
-request (three lanes of 3.4, 5.0 and 5.0 m inside the corridor) in 69 s, both without a "failed to
-make progress".
+the corridor sweep of 3 lanes x 5 m in 78 s, and the autonomous one with the arm counted: a 5 x 5 m
+request gave two lanes (1.6 and 3.9 m) in this 3.3-4.3 m corridor, swept in 36 s, both without a
+"failed to make progress". At the start tape it refused to turn: a wall is 1.05 m away there.
 
 ## Speed governor
 
@@ -71,7 +78,7 @@ lowers the forward speed:
 
 | mode | when | forward speed |
 |---|---|---|
-| stop | a bump or hole of 10 cm or more on the wheel track within 35 cm of the front wheels, or a lidar return within 40 cm of the front bumper and inside the robot's own width | 0 |
+| stop | a bump or hole of 10 cm or more on the wheel track within 35 cm of the front wheels, or a lidar return inside the robot's own width within 15 cm of its front: the arm's camera housing in Pose B, 1.05 m ahead of the centre (`front_m`; 0.47 m, the bumper, with the arm tucked) | 0 |
 | slow | any other hazard from the depth node on the track ahead, until the rear wheels are past it | 0.20 m/s |
 | free | otherwise | up to `max_speed` (0.5 m/s) |
 
@@ -80,7 +87,9 @@ asked for; at a stop it may still turn on the spot, and reversing passes. 0.20 m
 can feel a hazard: on the 2026-10-08 runs it felt rigid objects from 15 mm at 0.2-0.3 m/s, and nothing
 at all above 0.4 m/s on tile. While the wheels cross a hazard on the track, the governor measures the
 jolt and publishes on `/governor/felt` whether it was felt (class C) or not (class A). Pieces of one
-object closer than 0.6 m that share a jolt come out as `part_of` the first one. `/governor/hazards`
+object closer than 0.6 m that share a jolt come out as `part_of` the first one. A crossing counts only
+while the robot drives forward (at least 0.1 m/s, turning under 0.3 rad/s): turning on the spot shakes
+it by itself. `/governor/hazards`
 lists every tracked hazard once a second (for the live inspection page). Formats: `docs/schema.md`.
 
 On the robot `tools/robot/governor_up.sh` starts it with the depth node and `/scan_fixed`. By hand:
@@ -95,7 +104,7 @@ For Nav2, make its collision monitor publish to `/cmd_vel_in` (`make_nav2_robot.
 cmd_vel_in`). Without `enable:=true` it publishes only `/governor/state`. Once it has had any input it
 sends zeros when the input stops for 0.5 s, so nothing else may drive `/cmd_vel` while it runs.
 
-Live on the robot (2026-10-27, teleop up to 0.3 m/s): stopped 0.37-0.40 m before a wall, stopped
+Live on the robot (2026-10-27, teleop up to 0.3 m/s, the stop then measured from the bumper): stopped 0.37-0.40 m before a wall, stopped
 0.34-0.35 m before 123 mm and 216 mm objects, slowed from 0.30 to 0.20 m/s before 10-23 mm plates,
 and felt 10 mm (jolt 0.87 m/s²), 19 mm (1.48), 18 mm (2.65), 21 mm (1.68) and 74 mm (1.28) plates.
 

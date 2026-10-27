@@ -309,7 +309,29 @@ error, the lidar ray-cast from the map):
 Simulated, the full 5 m x 3 lane sweep then takes 78 s with no "failed to make progress".
 
 **The inspection page for the sweep**, placed with offline SLAM instead of wheels + IMU: the lidar
-map under the stitched floor, and the route in orange where the governor slowed the robot.
+map under the stitched floor, and the route in orange where the governor slowed the robot. The first
+version was poor: swirls of frames from the 190 s the robot turned at the lane change, every grout line
+laid two or three times, and 15 "cracks" that were all pieces of grout. Laid flat, one frame's tiles are
+square to 0.5°, but between frames SLAM's heading varied by 1-2.5° (and up to 10° while the robot
+hovered) and its position by up to 10 cm. Now:
+
+- frames only while driving: at least 5 cm/s, no turning on the spot or curves tighter than 1 m, in
+  stretches of at least 0.5 m
+- on a floor with a grid (tiles, paving: lines in two directions at right angles in at least half of the
+  frames) the lines give each frame its heading (the median direction over all frames) and its position
+  (each grout line on the same line laid before, nearest within 14 cm, under half a 30 cm tile);
+  elsewhere frames are matched on edges, ±2.5° and ±6 cm, with the correction kept under 15 cm so the
+  page stays on the map positions
+- on a grid floor cracks must be seen in 3 frames and 40 % of the views, and nothing along the grid's
+  lines counts: all 15 grout "cracks" are gone, 0 m of cracks on this floor. Outdoors nothing changes:
+  `garden_surfaces_1628` keeps 11.5 m of asphalt cracks (12.9 m before) and its 12 high-priority items
+- a bump within 10 cm of a wall in the lidar map is the foot of the wall
+- a crossing is judged felt only while driving forward (at least 0.1 m/s, turning under 0.3 rad/s): a
+  skid-steer robot turning on the spot shakes by itself. The tape-measured run 1447 is unchanged (block
+  1.88 and wooden block 0.81 felt, foam strips not)
+
+The one item left is a 13 mm bump the wheels felt at 0.23 m/s (jolt 0.77, just over the 0.75 limit), seen
+only at the edge of the depth image, with no colour photo: worth a look on site.
 
 ![inspection page of the sweep](media/inspection_sweep_1829.jpg)
 
@@ -317,10 +339,17 @@ map under the stitched floor, and the route in orange where the governor slowed 
 ([tools/robot/auto_session.sh](../tools/robot/auto_session.sh)): live SLAM, Nav2 and the governor;
 the robot turns once on the spot, fits lanes 0.8 m apart into the free floor it has mapped (at least
 0.6 m from walls and unknown space, up to the area it is given, [navigation/lane_planner.py](../navigation/lane_planner.py))
-and sweeps them. The lab's SLAM settings ignored scans while the robot turned on the spot
+and sweeps them. The arm counts: in Pose B the camera housing is 1.05 m ahead of the robot centre, so
+turning on the spot sweeps a circle of about 1 m. Lane ends and corners need 1.25 m free all round, the
+first turn on the spot is refused when the lidar sees anything that close, Nav2's outline includes the
+arm (`make_nav2_robot.py --arm-footprint`), and the governor's lidar stop is measured from the camera,
+0.15 m before it. Measured from the bumper, the live test's stop at 0.40 m left the camera 7 cm past the
+stop line: against a wall it would have touched. The lab's SLAM settings ignored scans while the robot turned on the spot
 (`check_min_dist_and_heading_precisely: false`): the map stayed at 13 m² through a full turn and
-grew to 70 m² once that was set. In simulation, from the start tape with a 5 x 5 m request, it
-planned three lanes (3.4, 5.0 and 5.0 m) inside the corridor and swept them in 69 s.
+grew to 70 m² once that was set. In simulation with a 5 x 5 m request it planned two lanes (1.6 and
+3.9 m) with room for the arm to turn and swept them in 36 s. In this 3.3-4.3 m corridor that is about 9 m²
+of floor instead of 21 m² without the arm; the start tape itself is only 1.05 m from a wall, so the robot
+has to start 0.7 m to its left.
 
 ![autonomous sweep in simulation](media/auto_sweep_sim.png)
 

@@ -34,7 +34,11 @@ class InspectionViz(Node):
         super().__init__("inspection_viz")
         self.d = json.load(open(os.path.join(out_dir, "inspection.json")))
         res, x0, y1 = self.d["m_per_px"], self.d["origin"]["x0"], self.d["origin"]["y1"]
-        self.world = lambda px, py: (x0 + px * res, y1 - py * res)
+        th = np.radians(self.d.get("rotation_deg", 0.0))     # pages turned along the lanes (inspection_map.py)
+        def world(px, py):
+            u, v = x0 + np.asarray(px) * res, y1 - np.asarray(py) * res
+            return u * np.cos(th) - v * np.sin(th), u * np.sin(th) + v * np.cos(th)
+        self.world = world
         qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL, reliability=ReliabilityPolicy.RELIABLE)
         self.pub_g = self.create_publisher(PointCloud2, "/inspection/ground", qos)
         self.pub_h = self.create_publisher(MarkerArray, "/inspection/hazards", qos)
