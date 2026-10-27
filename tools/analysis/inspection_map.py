@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Inspection map of one run: a photo of the driven ground with every hazard and crack on it.
 
-    inspection_map.py BAG OUT_DIR
+    inspection_map.py BAG OUT_DIR [--poses SLAM_POSES.csv --map SLAM_MAP.yaml]
 
 The camera looks almost straight down (about 10 deg off), so each colour frame can be
 laid on the ground plane fitted in the depth image. The frames are stitched in the map
-frame of hazard_map.py (wheel speed + IMU heading) at 5 mm per pixel; where frames
-overlap, the pixel nearest the centre of its own image wins. On top: the crack pixels
-of the U-Net, with the filters of hazard_map.py, and every hazard of hazard_map.py
-with a photo of it.
+frame of hazard_map.py (wheel speed + IMU heading, or SLAM with --poses) at 5 mm per
+pixel; where frames overlap, the pixel nearest the centre of its own image wins. On top:
+the crack pixels of the U-Net, with the filters of hazard_map.py, and every hazard of
+hazard_map.py with a photo of it. With --map the lidar map is drawn under it, 2.5 m around
+the route; a bag recorded through the speed governor also marks where it slowed or stopped.
 
 Writes to OUT_DIR:
   ground.jpg        the stitched ground
@@ -16,22 +17,61 @@ Writes to OUT_DIR:
   cracks.png        the cracks, same size, transparent elsewhere
   crops/H*.jpg      one photo per hazard: the camera frame of the closest sighting for
                     bumps and holes, a cut-out of the stitched ground for cracks
+  map.png           with --map: walls dark, free floor light, unknown transparent, same size
   inspection.json   hazards with position along the route, side, size, class,
-                    priority and photo; the path; the map's pixel scale
+                    priority and photo; the path, with the governor's mode per 0.25 m; the
+                    map's pixel scale
 """
-import json, os, sys
-import numpy as np, cv2
+import argparse, json, os, sys
+import numpy as np, cv2, yaml
 from scipy import ndimage
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import hazard_map as hm
 from rclpy.serialization import deserialize_message
 from sensor_msgs.msg import Image, CameraInfo
+from std_msgs.msg import String
 
 RES = 0.005          # m per pixel of the stitched ground
 COLOR_EVERY = 5      # colour at 30 Hz: every 5th frame, 6 a second
 V_MAX = 480          # rows of the colour image; the crack node's robot mask decides which are ground
 ROUGH_MM = 5.0       # same as the hazard map: small hazards on rougher ground are tufts and chips
 CRACK_RGB = (255, 150, 20)
+MAP_MARGIN = 2.5     # m of lidar map shown around the route
+
+
+def map_layer(map_yaml, x0, y1, W, H):
+    """The occupancy map resampled onto the ground photo's pixels, as RGBA."""
+    meta = yaml.safe_load(open(map_yaml))
+    occ = cv2.imread(os.path.join(os.path.dirname(map_yaml), meta["image"]), cv2.IMREAD_GRAYSCALE)
+    res, (ox, oy) = meta["resolution"], meta["origin"][:2]
+    c = ((x0 + (np.arange(W) + 0.5) * RES - ox) / res).astype(int)
+    r = occ.shape[0] - 1 - ((y1 - (np.arange(H) + 0.5) * RES - oy) / res).astype(int)
+    inside = (r[:, None] >= 0) & (r[:, None] < occ.shape[0]) & (c[None, :] >= 0) & (c[None, :] < occ.shape[1])
+    cell = np.full((H, W), 205, np.uint8)
+    cell[inside] = occ[np.clip(r, 0, occ.shape[0] - 1)[:, None].repeat(W, 1)[inside],
+                       np.clip(c, 0, occ.shape[1] - 1)[None, :].repeat(H, 0)[inside]]
+    rgba = np.zeros((H, W, 4), np.uint8)
+    rgba[cell > 250] = (246, 244, 240, 255)          # free floor
+    rgba[cell < 50] = (52, 52, 56, 255)              # wall or obstacle
+    return rgba
+
+
+def governor_modes(bag, times):
+    """The speed governor's mode (free / slow / stop) for each interval between record times, if recorded."""
+    r = hm.open_bag(bag, ["/governor/state"])
+    S = []
+    while r.has_next():
+        _, data, st = r.read_next()
+        S.append((st * 1e-9, json.loads(deserialize_message(data, String).data)["mode"]))
+    if not S:
+        return [None] * len(times)
+    t = np.array([s[0] for s in S]); m = np.array([s[1] for s in S])
+    out, prev = [], times[0] - 0.5
+    for tr in times:
+        w = m[(t > prev) & (t <= tr)]
+        out.append("stop" if "stop" in w else "slow" if "slow" in w else "free" if len(w) else None)
+        prev = tr
+    return out
 
 
 def plane_in_colour(row, T_dc):
@@ -62,17 +102,24 @@ def priority(h, rough, offset=1.0):
 
 
 def main():
-    bag, out = sys.argv[1].rstrip("/"), sys.argv[2]
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("bag")
+    ap.add_argument("out")
+    ap.add_argument("--poses", help="SLAM poses CSV (tools/analysis/run_slam.sh): position from SLAM, not wheels + IMU")
+    ap.add_argument("--map", help="occupancy map YAML in the same frame as --poses, drawn under the ground photo")
+    opt = ap.parse_args()
+    bag, out = opt.bag.rstrip("/"), opt.out
     os.makedirs(os.path.join(out, "crops"), exist_ok=True)
-    ctx = hm.build(bag)
+    ctx = hm.build(bag, poses=opt.poses)
     path, hazards, recs, seg = ctx["path"], ctx["hazards"], ctx["recs"], ctx["seg"]
     planes, T_bd, T_bc, t_start = ctx["planes"], ctx["T_bd"], ctx["T_bc"], ctx["t_start"]
     T_cd = np.linalg.inv(T_bc) @ T_bd; T_dc = np.linalg.inv(T_cd)
 
     # extent: the ground the camera can see, 0.93 m ahead of the robot and about 0.5 m to each side
     cx, cy = hm.to_world(path, path["t"], np.array([[T_bc[0, 3], 0.0]] * len(path["t"])))
-    x0, x1 = cx.min() - 0.9, cx.max() + 0.9
-    y0, y1 = cy.min() - 0.9, cy.max() + 0.9
+    margin = MAP_MARGIN if opt.map else 0.9
+    x0, x1 = cx.min() - margin, cx.max() + margin
+    y0, y1 = cy.min() - margin, cy.max() + margin
     W, H = int(np.ceil((x1 - x0) / RES)), int(np.ceil((y1 - y0) / RES))
     ground = np.full((H, W, 3), 238, np.uint8)
     best = np.full((H, W), np.inf, np.float32)
@@ -164,6 +211,8 @@ def main():
     cv2.imwrite(os.path.join(out, "ground.jpg"), ground[:, :, ::-1], [cv2.IMWRITE_JPEG_QUALITY, 88])
     mask = np.zeros((H, W, 4), np.uint8); mask[cover, 3] = 255      # where the ground photo is real, for viewers
     cv2.imwrite(os.path.join(out, "cover.png"), mask)
+    if opt.map:
+        cv2.imwrite(os.path.join(out, "map.png"), cv2.cvtColor(map_layer(opt.map, x0, y1, W, H), cv2.COLOR_RGBA2BGRA))
 
     crack = (crack_n >= 2) & (crack_n >= 0.3 * np.maximum(cover_n, 1)) & (allowed > 0)
     crack = cv2.dilate(crack.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
@@ -222,11 +271,14 @@ def main():
             j["box_px"] = [int(cx_.min()), int(cy_.min()), int(cx_.max()), int(cy_.max())]
         items.append(j)
     pxp, pyp = to_px(rec_xy[:, 0], rec_xy[:, 1])
+    modes = governor_modes(bag, [r_["t"] for r_ in recs])
     data = {
         "run": ctx["name"], "length_m": round(float(path["s"][-1]), 1), "m_per_px": RES,
         "width_px": W, "height_px": H, "origin": {"x0": round(x0, 3), "y1": round(y1, 3)},
-        "path": [[int(a), int(b), None if np.isnan(u) else round(float(u), 1), s_]
-                 for a, b, u, s_ in zip(pxp, pyp, rec_u, rec_surf)],
+        "map": "map.png" if opt.map else None,
+        "positions": "SLAM (lidar)" if opt.poses else "wheels + IMU heading",
+        "path": [[int(px_), int(py_), None if np.isnan(u) else round(float(u), 1), s_, g]
+                 for px_, py_, u, s_, g in zip(pxp, pyp, rec_u, rec_surf, modes)],
         "crack_length_m": round(sum(i["length_mm"] for i in items if i["type"] == "crack") / 1000.0, 1),
         "hazards": items,
         "rules": {

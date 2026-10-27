@@ -59,6 +59,12 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 #ground { -webkit-mask-size: 100% 100%; mask-size: 100% 100%; }
 #overlay { position: absolute; left: 0; top: 0; overflow: visible; }
 .route { fill: none; stroke: var(--ink); stroke-opacity: .35; stroke-width: 2; stroke-dasharray: 6 6; vector-effect: non-scaling-stroke; }
+.gov { fill: none; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; stroke-opacity: .8; vector-effect: non-scaling-stroke; }
+.gov.slow { stroke: var(--accent); } .gov.stop { stroke: var(--high); }
+.hide-route .gov { display: none; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) #lidarmap { filter: invert(.9) hue-rotate(180deg); } }
+:root[data-theme="dark"] #lidarmap { filter: invert(.9) hue-rotate(180deg); }
+.sw.line { height: 4px; border-radius: 2px; }
 .mk { cursor: pointer; transform-box: view-box; }
 .mk .shape { stroke-width: 2.2; vector-effect: non-scaling-stroke; }
 .mk .ring { fill: none; stroke-width: 2.5; vector-effect: non-scaling-stroke; opacity: 0; }
@@ -156,6 +162,7 @@ img { max-width: 100%; }
     <section class="mapwrap" aria-label="Map of the driven ground">
       <div id="map">
         <div id="stage">
+          <img id="lidarmap" alt="Lidar map of the area">
           <img id="ground" alt="Ground stitched from the robot camera">
           <img id="cracks" alt="">
           <svg id="overlay" xmlns="http://www.w3.org/2000/svg"></svg>
@@ -166,7 +173,9 @@ img { max-width: 100%; }
         <label><input type="checkbox" id="l-crk" checked><span class="sw" style="background:var(--crack)"></span>Cracks</label>
         <label><input type="checkbox" id="l-haz" checked><span class="sw" style="background:var(--bump)"></span>Bumps and holes</label>
         <label><input type="checkbox" id="l-route" checked>Route</label>
+        <label id="l-slow-key" hidden><span class="sw line" style="background:var(--accent)"></span>Robot slowed</label>
         <label><input type="checkbox" id="l-photo" checked>Ground photo</label>
+        <label id="l-map-wrap" hidden><input type="checkbox" id="l-map" checked>Map (lidar)</label>
       </div>
       <div class="panel-float scale" aria-hidden="true"><i id="scalebar"></i><span id="scaletxt">1 m</span></div>
       <div class="panel-float zoom">
@@ -192,7 +201,7 @@ img { max-width: 100%; }
       <details class="more">
         <summary>How to read this</summary>
         <p id="rules"></p>
-        <p>Positions come from wheel speed and the IMU heading, good to a few tens of centimetres over a run. Route metres count from where the robot started.</p>
+        <p id="positions">Positions come from wheel speed and the IMU heading, good to a few tens of centimetres over a run. Route metres count from where the robot started.</p>
       </details>
     </aside>
   </main>
@@ -200,6 +209,7 @@ img { max-width: 100%; }
 
 <script>
 const RUNS = [
+  { id: "1829", name: "Corridor sweep", sub: "27 Oct · Nav2 sweep, speed governor, lidar map" },
   { id: "1628", name: "Garden run", sub: "8 Oct · red path, wood chips, grass, asphalt" },
   { id: "1548", name: "Garden loop", sub: "8 Oct · asphalt, grass, cracked asphalt" },
   { id: "1447", name: "Corridor test", sub: "8 Oct · tape-measured objects" },
@@ -283,6 +293,7 @@ const layer = (id, cls, el) => $(id).addEventListener("change", e => {
   if (el) el.hidden = !e.target.checked; if (cls) svg.classList.toggle(cls, !e.target.checked);
 });
 layer("#l-crk", "hide-crk", $("#cracks")); layer("#l-haz", "hide-haz"); layer("#l-route", "hide-route"); layer("#l-photo", null, $("#ground"));
+layer("#l-map", null, $("#lidarmap"));
 $("#showlow").addEventListener("change", () => { svg.classList.toggle("hide-low", !$("#showlow").checked); renderList(); });
 document.querySelectorAll(".seg button").forEach(b => b.onclick = () => {
   filt = b.dataset.f; document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", x === b)); renderList();
@@ -325,22 +336,39 @@ function renderStats() {
     <div class="stat check"><b>${n("check")}</b>check on site</div>`;
 }
 function renderMap() {
-  const W = D.width_px, H = D.height_px, base = `runs/${run}/`;
+  const W = D.width_px, H = D.height_px, base = `runs/${run}/`, v = D.live ? `?t=${D.stamp}` : "";
   stage.style.width = W + "px"; stage.style.height = H + "px";
   const g = $("#ground");
   g.style.width = W + "px"; g.style.height = H + "px";
-  g.style.webkitMaskImage = g.style.maskImage = `url(${base}cover.png)`;
-  g.src = base + "ground.jpg";
-  const c = $("#cracks"); c.style.width = W + "px"; c.style.height = H + "px"; c.src = base + "cracks.png";
+  g.style.webkitMaskImage = g.style.maskImage = `url(${base}cover.png${v})`;
+  g.src = base + "ground.jpg" + v;
+  const c = $("#cracks"); c.style.width = W + "px"; c.style.height = H + "px"; c.src = base + "cracks.png" + v;
+  const lm = $("#lidarmap"); lm.style.width = W + "px"; lm.style.height = H + "px";
+  $("#l-map-wrap").hidden = !D.map;
+  lm.hidden = !D.map || !$("#l-map").checked;
+  if (D.map) lm.src = base + D.map + v; else lm.removeAttribute("src");
+  $("#positions").textContent = D.positions === "SLAM (lidar)"
+    ? "Positions come from the lidar map (SLAM), good to about ten centimetres. Route metres count from where the robot started. An orange route means the speed governor slowed the robot for a hazard ahead, so the IMU could feel it; red means it stopped."
+    : "Positions come from wheel speed and the IMU heading, good to a few tens of centimetres over a run. Route metres count from where the robot started.";
   svg.setAttribute("width", W); svg.setAttribute("height", H); svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   const pts = D.path.map(p => p[0] + "," + p[1]).join(" ");
+  // stretches where the governor slowed or stopped the robot (5th field, only in bags driven through it)
+  const gov = []; let cur = null;
+  D.path.forEach((p, i) => {
+    const m = p[4] === "slow" || p[4] === "stop" ? p[4] : null;
+    if (m && (!cur || cur.m !== m)) { cur = { m, pts: i ? [D.path[i - 1]] : [] }; gov.push(cur); }
+    if (m) cur.pts.push(p); else cur = null;
+  });
+  $("#l-slow-key").hidden = !gov.length;
+  const govLines = gov.map(g => `<polyline class="gov ${g.m}" points="${g.pts.map(p => p[0] + "," + p[1]).join(" ")}"/>`).join("");
   const marks = [...D.hazards].sort((a, b) => ORDER[b.priority] - ORDER[a.priority]).map(h =>
     `<g class="mk t-${h.type} p-${h.priority}" data-id="${h.id}" style="transform: translate(${h.px}px, ${h.py}px) scale(var(--k))">
        <circle class="ring" r="15"/>${glyph(h)}<title>${h.id} ${title(h)}, ${size(h)}</title></g>`).join("");
-  svg.innerHTML = `<polyline class="route" points="${pts}"/>${marks}`;
+  svg.innerHTML = `${govLines}<polyline class="route" points="${pts}"/>${marks}`;
   svg.classList.toggle("hide-low", !$("#showlow").checked);
-  let pending = 2; const done = () => { if (--pending === 0) $("#loading").hidden = true; };
+  let pending = D.map ? 3 : 2; const done = () => { if (--pending === 0) $("#loading").hidden = true; };
   g.onload = c.onload = done; g.onerror = c.onerror = done;
+  if (D.map) lm.onload = lm.onerror = done;
 }
 function visible(h) {
   if (h.priority === "low" && !$("#showlow").checked) return false;
@@ -370,7 +398,7 @@ function renderDetail() {
       Pick an item in the work list or on the map to see its photo, size and where to find it.</div>`;
     return;
   }
-  const photo = h.crop ? `<img src="runs/${run}/${h.crop}" alt="${title(h)} ${h.id}">`
+  const photo = h.crop ? `<img src="runs/${run}/${h.crop}${D.live ? "?t=" + D.stamp : ""}" alt="${title(h)} ${h.id}">`
     : `<p>${h.class === "B" ? "Nothing to photograph: the camera saw no object here." : "No photo: " + (h.note || "outside the colour camera's view")}.</p>`;
   const rows = [
     ["Priority", `<span class="pill ${h.priority}">${h.priority}</span> ${reason(h)}`],
@@ -378,7 +406,7 @@ function renderDetail() {
     ["Size", h.type === "crack" ? `<span class="num">${(h.length_mm / 1000).toFixed(2)} m × ${(h.width_mm / 1000).toFixed(2)} m</span> area`
       : h.class === "B" ? "unknown" : `<span class="num">${h.height_mm} mm</span> ${h.type === "hole" ? "deep" : "high"}, <span class="num">${h.length_mm} × ${h.width_mm} mm</span>`],
     ["Class", `${h.class}: ${CLASS[h.class]}`],
-    h.imu_peak != null ? ["IMU jolt", `<span class="num">${h.imu_peak} m/s²</span> at <span class="num">${h.crossing_speed} m/s</span>`] : null,
+    h.imu_peak != null ? ["IMU jolt", `<span class="num">${h.imu_peak} m/s²</span>` + (h.crossing_speed != null ? ` at <span class="num">${h.crossing_speed} m/s</span>` : "")] : null,
     h.surface ? ["Surface", h.surface] : null,
     h.seen ? ["Seen in", `<span class="num">${h.seen}</span> camera frames`] : null,
   ].filter(Boolean);
@@ -395,7 +423,18 @@ function select(id, pan) {
   if (h && matchMedia("(max-width: 860px)").matches && !pan) $("#detail").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+/* a live run (tools/analysis/inspection_live.py on the robot) is fetched again every 2 s */
+let liveTimer = null;
+async function refresh() {
+  try {
+    const d = await (await fetch(`runs/${run}/inspection.json`, { cache: "no-store" })).json();
+    if (d.stamp === D.stamp) return;
+    D = d; renderStats(); renderMap(); renderDetail(); renderList();
+    svg.querySelectorAll(".mk").forEach(m => m.classList.toggle("sel", m.dataset.id === sel));
+  } catch (e) { /* the robot is writing or out of reach: try again next time */ }
+}
 async function load(id) {
+  clearInterval(liveTimer);
   run = id; sel = null; $("#loading").hidden = false;
   document.querySelectorAll(".run").forEach(b => b.setAttribute("aria-pressed", b.dataset.id === id));
   try { history.replaceState(null, "", "#r" + id); } catch (e) {}
@@ -406,12 +445,19 @@ async function load(id) {
   }
   $("#rules").textContent = `${D.rules.class}. Priority: ${D.rules.priority}. Rough ground: ${D.rules.rough_ground}.`;
   renderStats(); renderMap(); renderDetail(); renderList(); fit(false);
+  if (D.live) liveTimer = setInterval(refresh, 2000);
 }
 
-$("#runs").innerHTML = RUNS.map(r => `<button class="run" data-id="${r.id}" aria-pressed="false">${r.name} <span class="num" style="color:var(--muted)">${r.id}</span><small>${r.sub}</small></button>`).join("");
-document.querySelectorAll(".run").forEach(b => b.onclick = () => load(b.dataset.id));
-const start = (location.hash.match(/^#r(\d{4})$/) || [])[1];
-load(RUNS.some(r => r.id === start) ? start : RUNS[0].id);
+(async () => {
+  try {   // served from the robot during a run: show the live run first
+    const r = await fetch("runs/live/inspection.json", { cache: "no-store" });
+    if (r.ok) RUNS.unshift({ id: "live", name: "Live run", sub: "the robot is driving · updates every 2 s" });
+  } catch (e) {}
+  $("#runs").innerHTML = RUNS.map(r => `<button class="run" data-id="${r.id}" aria-pressed="false">${r.name} <span class="num" style="color:var(--muted)">${r.id === "live" ? "●" : r.id}</span><small>${r.sub}</small></button>`).join("");
+  document.querySelectorAll(".run").forEach(b => b.onclick = () => load(b.dataset.id));
+  const start = (location.hash.match(/^#r(\w+)$/) || [])[1];
+  load(RUNS.some(r => r.id === start) ? start : RUNS[0].id);
+})();
 </script>
 </body>
 </html>

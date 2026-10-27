@@ -91,8 +91,10 @@ def camera_transforms(bag):
     return get("camera_depth_optical_frame"), get("camera_color_optical_frame")
 
 
-def motion(bag, t_start):
-    """Path from wheel speed + IMU heading, IMU fast/slow ratio, and the vertical jolt signal."""
+def motion(bag, t_start, poses=None):
+    """Path from wheel speed + IMU heading, IMU fast/slow ratio, and the vertical jolt signal.
+    With poses (a run_slam.sh / pose_logger.py CSV with map_yaw) the position and heading come
+    from SLAM instead, in its map frame; the wheels still give speed and distance driven."""
     O, Y, F = [], [], []
     r = open_bag(bag, ["/odom", "/imu/data", "/filter/free_acceleration"])
     while r.has_next():
@@ -110,6 +112,11 @@ def motion(bag, t_start):
     yaw = np.interp(O[:, 0], Y[:, 0], np.unwrap(Y[:, 1]) - Y[0, 1])
     dt = np.diff(O[:, 0], prepend=O[0, 0])
     px, py = np.cumsum(O[:, 1] * dt * np.cos(yaw)), np.cumsum(O[:, 1] * dt * np.sin(yaw))
+    if poses is not None:
+        P = np.genfromtxt(poses, delimiter=",", names=True)
+        tp = P["t"] - t_start
+        px, py = np.interp(O[:, 0], tp, P["map_x"]), np.interp(O[:, 0], tp, P["map_y"])
+        yaw = np.interp(O[:, 0], tp, np.unwrap(P["map_yaw"]))
     path = dict(t=O[:, 0], v=O[:, 1], x=px, y=py, yaw=yaw, s=np.cumsum(np.abs(O[:, 1]) * dt))
 
     N, FS = 180, 100.0
@@ -312,12 +319,12 @@ def crack_segmenter():
     raise SystemExit("crack_unet16_v1.onnx not found: download it from the crack-model-v1 release (docs/crack_model.md)")
 
 
-def build(bag, use_cracks=True):
+def build(bag, use_cracks=True, poses=None):
     """Everything up to the classified hazards and the 0.25 m records, for this script and inspection_map.py."""
     bag = bag.rstrip("/"); name = os.path.basename(bag)
     t_start = open_bag(bag, []).get_metadata().starting_time.nanoseconds * 1e-9
     T_bd, T_bc = camera_transforms(bag)
-    path, R, J = motion(bag, t_start)
+    path, R, J = motion(bag, t_start, poses)
     seg = crack_segmenter() if use_cracks else None
     dets, U, cracks, stats, planes = camera_pass(bag, t_start, path, T_bd, T_bc, seg)
 
