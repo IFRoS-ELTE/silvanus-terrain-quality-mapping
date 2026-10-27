@@ -1,83 +1,115 @@
 # Navigation
 
-`coverage_sweep.py` drives a zigzag (boustrophedon) sweep over a rectangle with
-Nav2's FollowWaypoints and logs the robot's path from TF. It needs a running Nav2
-with a `map` frame.
+| file | what |
+|---|---|
+| `make_nav2_robot.py` | the robot's Nav2 settings, made from the lab's simulator ones |
+| `coverage_sweep.py` | a zigzag sweep over a rectangle you give, on a saved map |
+| `lane_planner.py`, `auto_sweep.py` | the autonomous sweep: lanes fitted into the free floor of the live map |
+| `speed_governor.py`, `governor_watch.py` | slow at hazards so the IMU can feel them, stop at obstacles |
+| `../tools/sim/fake_robot.py` | the robot on a saved map (wheels with a realistic error, lidar ray-cast from the map), to test all of this on a laptop |
+
+On the robot these run through the session scripts in [tools/robot](../tools/robot):
+`sweep_session.sh` (saved map) and `auto_session.sh` (no map, nobody driving).
+
+## Nav2 on the robot
+
+The lab's `scout_xarm_navigation/config/nav2_params.yaml` is written for Gazebo. `make_nav2_robot.py`
+writes the robot's version: real time, plain Twist (what the Scout base takes), `/scan_fixed` in its
+own frame in both costmaps and the collision monitor, lidar beams with no return clearing the
+costmap (otherwise a person who walked past stays an obstacle), and an AMCL section.
 
 ```bash
-python3 coverage_sweep.py --x0 0.8 --y0 -1.6 --length 2.4 --width 3.2 --spacing 0.8
-# in simulation add:  --ros-args -p use_sim_time:=true
+L=~/workspaces/scout_xarm_ros2/src/scout_xarm_navigation/config/nav2_params.yaml
+# goals from RViz on a saved map, Nav2 driving the base directly, 0.2 m/s
+python3 make_nav2_robot.py $L nav2_robot.yaml --max-speed 0.2 --initial-pose 3.037 -3.203 66.34
+# sweeps: through the speed governor, Pure Pursuit, looser goal check
+python3 make_nav2_robot.py $L nav2_robot_governor.yaml --max-speed 0.35 --initial-pose 3.037 -3.203 66.34 \
+    --cmd-vel-out cmd_vel_in --goal-tolerance 0.35 30 --controller rpp
 ```
 
-Writes `coverage_path.csv` (t, x, y) and `coverage_path_waypoints.csv`.
+The initial pose is the start tape of the `indoor_loop3_1316` map. For sweeps three things differ from
+the lab's settings, each found on the first sweep on 2026-10-27, where the robot stood 190 s turning
+0.23-0.5 m from a lane-change corner, and each checked in simulation:
+
+- goal tolerance 0.35 m / 30° instead of 0.20 m: AMCL's spread in the corridor was 0.3-0.45 m
+- Regulated Pure Pursuit inside the Rotation Shim instead of MPPI: the lab's forward-only MPPI circles
+  a goal it cannot line up with; the shim turns on the spot to face the path and the goal heading
+- every corner faces the next leg (`coverage_sweep.lanes`, `lane_planner.plan`): turn on the spot,
+  drive straight, turn. Facing along the lane, the next lane start sat beside the robot.
+
+## Sweeps
+
+On a saved map, with a rectangle in its frame (`--yaw` turns it, e.g. along a corridor):
+
+```bash
+python3 coverage_sweep.py --x0 3.875 --y0 -0.294 --yaw 66.34 --length 5 --width 1.6 --spacing 0.8
+```
+
+Autonomous, with live SLAM and no saved map. The robot stands where the sweep should start, facing
+the area; it turns once on the spot, fits lanes 0.8 m apart into the free floor it has mapped (at
+least 0.6 m from walls and unknown space, each lane cut to its longest free stretch, shorter than 1 m
+dropped), up to the area it is given, and sweeps them:
+
+```bash
+python3 auto_sweep.py --length 5 --width 5          # --dry: turn and plan only
+python3 -m pytest test_lane_planner.py
+```
+
+Live SLAM needs `check_min_dist_and_heading_precisely: true` (`auto_session.sh` sets it). With the
+lab's `false` SLAM Toolbox waits for 9 cm of travel and the turn on the spot maps nothing (13 m² before
+and after a full turn in simulation, 70 m² with `true`).
+
+Tested in simulation (`fake_robot.py` on the `indoor_loop3_1316` map, 5 % turn error on the wheels):
+the corridor sweep of 3 lanes x 5 m in 78 s, and the autonomous one from the start tape with a 5 x 5 m
+request (three lanes of 3.4, 5.0 and 5.0 m inside the corridor) in 69 s, both without a "failed to
+make progress".
 
 ## Speed governor
 
 `speed_governor.py` sits between whatever drives the robot and the base, and only ever
-lowers the forward speed (turning and reversing pass unchanged):
+lowers the forward speed:
 
 | mode | when | forward speed |
 |---|---|---|
-| stop | a bump or hole of 10 cm or more on the wheel track within 35 cm of the front wheels, or a lidar return within 40 cm of the front bumper | 0 |
+| stop | a bump or hole of 10 cm or more on the wheel track within 35 cm of the front wheels, or a lidar return within 40 cm of the front bumper and inside the robot's own width | 0 |
 | slow | any other hazard from the depth node on the track ahead, until the rear wheels are past it | 0.20 m/s |
-| free | otherwise | up to 0.5 m/s |
+| free | otherwise | up to `max_speed` (0.5 m/s) |
 
-0.20 m/s is where the IMU can feel a hazard: on the 2026-10-08 runs it felt rigid objects
-from 15 mm at 0.2-0.3 m/s, and nothing at all above 0.4 m/s on tile. While the wheels cross
-a hazard on the track, the governor measures the jolt and publishes on `/governor/felt`
-whether it was felt (class C) or not (class A). Formats: `docs/schema.md`.
+When it slows the robot it slows the turn by the same factor, so the robot keeps the curve it was
+asked for; at a stop it may still turn on the spot, and reversing passes. 0.20 m/s is where the IMU
+can feel a hazard: on the 2026-10-08 runs it felt rigid objects from 15 mm at 0.2-0.3 m/s, and nothing
+at all above 0.4 m/s on tile. While the wheels cross a hazard on the track, the governor measures the
+jolt and publishes on `/governor/felt` whether it was felt (class C) or not (class A). Pieces of one
+object closer than 0.6 m that share a jolt come out as `part_of` the first one. `/governor/hazards`
+lists every tracked hazard once a second (for the live inspection page). Formats: `docs/schema.md`.
 
-On the robot, with the depth node running, an operator at the e-stop, and the scan fix
-from docs/PROGRESS.md running (`/scan_fixed`):
+On the robot `tools/robot/governor_up.sh` starts it with the depth node and `/scan_fixed`. By hand:
 
 ```bash
-python3 navigation/speed_governor.py --ros-args -p enable:=true
-ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args -r cmd_vel:=/cmd_vel_in
+python3 navigation/speed_governor.py --ros-args -p enable:=true -p max_speed:=0.5
+ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args -r cmd_vel:=/cmd_vel_in   # hold the key
 python3 navigation/governor_watch.py       # free / slow / stop and why, felt or not per hazard
 ```
 
-For Nav2, remap its velocity output to `/cmd_vel_in`. Without `enable:=true` it publishes
-only `/governor/state` and nothing on `/cmd_vel`. When the input stops for 0.5 s it sends
-zeros instead of holding the last speed. First live test: wheels off the ground, then
-`max_speed:=0.3`.
+For Nav2, make its collision monitor publish to `/cmd_vel_in` (`make_nav2_robot.py --cmd-vel-out
+cmd_vel_in`). Without `enable:=true` it publishes only `/governor/state`. Once it has had any input it
+sends zeros when the input stops for 0.5 s, so nothing else may drive `/cmd_vel` while it runs.
 
-To watch it decide, `python3 navigation/governor_watch.py` prints each change between free, slow
-and stop, and felt or not per hazard. To see it without the robot, on a recording:
+Live on the robot (2026-10-27, teleop up to 0.3 m/s): stopped 0.37-0.40 m before a wall, stopped
+0.34-0.35 m before 123 mm and 216 mm objects, slowed from 0.30 to 0.20 m/s before 10-23 mm plates,
+and felt 10 mm (jolt 0.87 m/s²), 19 mm (1.48), 18 mm (2.65), 21 mm (1.68) and 74 mm (1.28) plates.
+
+Offline: `python3 -m pytest navigation/test_speed_governor.py` (21 cases), and on a recording:
 
 ```bash
 navigation/replay_governor.sh ~/bags/corridor_groundtruth_1447 0.4
 ```
 
-Tested offline (not yet on the robot):
-- `python3 -m pytest navigation/test_speed_governor.py`: 8 cases of the stop / slow / free
-  decision, including a 12 cm bump 20 cm ahead of the front wheels and a lidar obstacle.
-- Replay of `corridor_groundtruth_1447` through the depth node and the governor, with a
-  constant 0.4 m/s command: it slows to 0.2 m/s before the 50 mm foam block and the wooden
-  blocks and goes back to 0.4 m/s after them. The block comes out felt (jolt 1.81 m/s², C), a
-  15 mm wooden block felt (0.97, C), and a neighbouring hazard is not credited with the same
-  jolt. Outdoors (`garden_surfaces_1628`) a 30 mm bump on wood chips is felt (2.68). The
-  stop rule did not fire on the recordings: the depth node measured the kerb at 34-36 mm in
-  replay, below the 10 cm stop height.
+which slows for the 50 mm foam block and finds it felt (1.81 m/s², C).
 
 ## In the lab simulator (2026-10-08)
 
-Nav2 accepted the waypoints ("Begin navigating from (0.00, 0.00) to (0.60, -1.50)")
-but the sweep did not complete in either world. The simulated skid-steer turns
-far less than commanded:
-
-| command (4 s) | simulated robot | expected |
-|---|---|---|
-| rotate in place 0.5 rad/s | 50 deg | 115 deg |
-| arc 0.2 m/s + 0.4 rad/s | 24 deg, 0.16 m | 92 deg, 0.8 m |
-
-Its wheel odometry and SLAM then disagree by more than 3 m, and the MPPI
-controller keeps resetting ("Failed to make progress"). Driving straight works,
-which is all the lab's own Nav2 check (a 0.22 m goal) tests. The training-ground
-world is also almost empty, so SLAM has little to match.
-
-The fix is in the simulator, not here: wheel friction or
-`wheel_separation_multiplier` for `scout_base_controller` in
-`scout_xarm_gazebo/config/ros2_controllers.yaml`, tuned until a commanded turn
-gives the same turn in simulation. The real Scout misjudges turns too (15-30 deg
-per run from its wheels), so on the robot run Nav2 with the IMU-fused odometry
-(`config/ekf_odom_imu.yaml`).
+The lab's Gazebo skid-steer turns far less than commanded (0.5 rad/s for 4 s gives 50° instead of
+115°), so its wheel odometry and SLAM disagree by more than 3 m and Nav2 cannot follow a sweep. The fix
+is in the simulator (`wheel_separation_multiplier` for `scout_base_controller`). `tools/sim/fake_robot.py`
+is the simpler stand-in used above.
