@@ -2,8 +2,10 @@
 # start_robot.sh [extra silvanus-up.sh options, e.g. --no-base]
 #
 # Run on the robot (agilex@agilex-desktop). Does the whole start sequence:
-# CAN up, find the Xsens port, check the camera is on USB, stop any running
-# stack, start the lab stack with the measured IMU transform and 921600 baud.
+# CAN up, find the Xsens port, check the camera is on USB, mount the recording SSD
+# if it is plugged in, stop any running stack, start the lab stack with the measured
+# IMU transform and 921600 baud. Recordings go to the SSD when it is mounted
+# (/mnt/ssd/silvanus_bags), otherwise to /data/bags; BAGS_DIR=... overrides.
 set -u
 cd /opt/silvanus || { echo "no /opt/silvanus on this machine - run this on the robot"; exit 1; }
 
@@ -23,6 +25,16 @@ echo "Xsens at $DEV"
 if ! lsusb | grep -q 8086:0b07; then
     echo "WARNING: the D435 is not on USB - replug the camera cable, then run this again"
 fi
+
+SSD=/dev/disk/by-label/Robot-Data            # the professor's 1.8 TB exFAT SSD
+if [ -e $SSD ] && ! mountpoint -q /mnt/ssd; then
+    echo "mounting the SSD at /mnt/ssd"
+    sudo mount -t exfat $SSD /mnt/ssd || echo "WARNING: could not mount the SSD"
+fi
+if [ -z "${BAGS_DIR:-}" ] && mountpoint -q /mnt/ssd; then
+    export BAGS_DIR=/mnt/ssd/silvanus_bags
+fi
+echo "recordings go to ${BAGS_DIR:-/data/bags}"
 
 if sudo docker ps --format '{{.Names}}' | grep -qx silvanus; then
     echo "stopping the running stack"
