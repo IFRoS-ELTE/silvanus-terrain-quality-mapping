@@ -59,6 +59,7 @@ Published by the lab stack. We only read them. Names exactly as in our bags.
 | `/cmd_vel` | `geometry_msgs/Twist` | governor | robot base | exists |
 | `/governor/state` | `std_msgs/String` (JSON) | governor | logging, viewing | exists |
 | `/governor/felt` | `std_msgs/String` (JSON) | governor | fusion | exists |
+| `/governor/hazards` | `std_msgs/String` (JSON) | governor | live inspection page | exists |
 
 ### `/ground/hazards`
 
@@ -108,6 +109,17 @@ are past it, with the IMU jolt and the class it earns:
 
 ```json
 {"id": "G2", "type": "bump", "height_mm": 49, "x": 2.31, "y": -0.27, "imu_peak": 1.81, "felt": true, "class": "C"}
+```
+
+A piece of an object already credited with the same jolt, less than 0.6 m from it, carries
+`"part_of": "G2"` and the same verdict. `x`, `y` are in the odom frame.
+
+`/governor/hazards`, 1 Hz: every hazard the governor tracks, with the verdict once it is known
+(`tools/analysis/inspection_live.py` puts them on the live page):
+
+```json
+{"frame": "odom", "hazards": [{"id": "G2", "type": "bump", "height_mm": 49, "length_mm": 210, "x": 2.31, "y": -0.27,
+  "seen": 14, "done": true, "felt": true, "class": "C", "imu_peak": 1.81}]}
 ```
 
 ### `/terrain/imu_roughness`
