@@ -8,8 +8,11 @@
 #   governor slows to 0.2 m/s so the IMU can feel them and stops for tall ones and obstacles.
 # Everything is recorded, and the map is saved next to the recording. With "dry" it turns and
 # plans only: it prints the lanes it would drive, without driving or recording.
+# ROOM=1 sweeps the whole room instead of LENGTH x WIDTH: all the open floor it can reach without
+# passing a door, then again over what the map gained and the camera has not seen (up to 3 passes).
 #
 #   LENGTH=5 WIDTH=4 bash ~/auto_session.sh hall
+#   ROOM=1 bash ~/auto_session.sh lab
 #
 # Needs: the stack (start_robot.sh), the arm in Pose B (arm_to_pose.py), the robot facing the area,
 # ~/nav_robot/nav2_robot_governor.yaml, ~/auto_sweep.py, ~/lane_planner.py, ~/governor_up.sh,
@@ -19,6 +22,12 @@ NAME=${1:-auto_sweep}
 DRY=${2:-}
 LENGTH=${LENGTH:-5}
 WIDTH=${WIDTH:-5}
+ROOM=${ROOM:-}
+if [ -n "$ROOM" ]; then
+    AREA="--room"; AREA_TEXT="the whole room"; MAX_S=1800      # recording stops when the sweep ends
+else
+    AREA="--length $LENGTH --width $WIDTH"; AREA_TEXT="${LENGTH} m ahead x ${WIDTH} m across"; MAX_S=900
+fi
 ROS="source /opt/ros/jazzy/setup.bash && source /opt/robot/setup.bash"
 D="sudo docker exec silvanus"
 for f in ~/nav_robot/nav2_robot_governor.yaml ~/auto_sweep.py ~/lane_planner.py ~/governor_up.sh ~/record_session.sh \
@@ -54,19 +63,19 @@ params_file:=/tmp/nav_robot/nav2_robot_governor.yaml use_sim_time:=False > /tmp/
 for i in $(seq 60); do $D grep -q 'Managed nodes are active' /tmp/nav_robot/nav2.log 2>/dev/null && break; sleep 1; done
 $D grep -q 'Managed nodes are active' /tmp/nav_robot/nav2.log || { echo "Nav2 did not come up:"; $D tail -n 15 /tmp/nav_robot/nav2.log; exit 1; }
 echo "    Nav2 is up"
-read -r -p "4/6 In RViz the map should start to appear around the robot. Area: ${LENGTH} m ahead x ${WIDTH} m across. Enter to go on, Ctrl-C to stop: "
+read -r -p "4/6 In RViz the map should start to appear around the robot. Area: ${AREA_TEXT}. Enter to go on, Ctrl-C to stop: "
 
 if [ "$DRY" = dry ]; then
     echo "5/6 dry run: turn on the spot and plan, no driving, no recording"
     sudo docker exec -it silvanus bash -c "$ROS && cd /tmp/nav_robot && python3 auto_sweep.py \
---length $LENGTH --width $WIDTH --dry --log /tmp/nav_robot/auto.csv"
+$AREA --dry --log /tmp/nav_robot/auto.csv"
     echo "SLAM and Nav2 keep running. Plan: /tmp/nav_robot/auto_plan.json in the container"
     exit 0
 fi
 
 echo "5/6 recording (topic check first, about 20 s)"
 EXTRA_TOPICS="/map /governor/state /governor/felt /ground/hazards /ground/unevenness /cmd_vel_in /cmd_vel /plan" \
-    ~/record_session.sh "$NAME" 900 > /tmp/auto_record.txt 2>&1 &
+    ~/record_session.sh "$NAME" $MAX_S > /tmp/auto_record.txt 2>&1 &
 REC=$!
 for i in $(seq 60); do grep -q ">>> RECORDING" /tmp/auto_record.txt && break; kill -0 $REC 2>/dev/null || break; sleep 1; done
 if ! grep -q ">>> RECORDING" /tmp/auto_record.txt; then cat /tmp/auto_record.txt; echo "recording did not start"; exit 1; fi
@@ -77,7 +86,7 @@ sleep 3
 
 echo "6/6 turn, plan and sweep: stand at the e-stop"
 sudo docker exec -it silvanus bash -c "$ROS && cd /tmp/nav_robot && python3 auto_sweep.py \
---length $LENGTH --width $WIDTH --log /bags/${BAG}_auto.csv"
+$AREA --log /bags/${BAG}_auto.csv"
 
 $D bash -c "$ROS && timeout 30 ros2 run nav2_map_server map_saver_cli -f /bags/${BAG}_map > /dev/null 2>&1" \
     && echo "map saved: ${BAG}_map.pgm / .yaml"

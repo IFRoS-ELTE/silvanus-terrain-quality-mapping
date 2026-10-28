@@ -59,8 +59,26 @@ sideways if that fits more. `sweep_session.sh` plans the same way on the saved m
 
 ```bash
 python3 auto_sweep.py --length 5 --width 5          # --dry: turn and plan only
+python3 auto_sweep.py --room                        # the whole room
 python3 -m pytest test_lane_planner.py
 ```
+
+With `--room` (`ROOM=1` for `auto_session.sh`) there is no area to give. The area is all the open floor
+the robot can reach from where it stands without passing anywhere narrower than 1.2 m: a door is
+narrower, so the sweep stays in the room even though the lidar sees out through the door. Lanes then
+also lie behind the robot, and a lane that furniture cuts in two keeps both stretches. After a pass it
+plans again on the map it has built meanwhile, leaving out the floor the camera has already seen
+(0.4 m around the camera's track), and sweeps what is new, for example behind a cabinet the lidar could
+not see past from the start. From the second pass on it also tries lanes across, whichever covers more:
+they reach the floor beyond the ends of the first lanes and beside furniture. At most three passes, or
+until nothing new is left.
+
+In simulation, in a 9 x 7 m lab with a cabinet, a pillar and a door to a corridor (`tools/sim/test_lab.yaml`,
+start at 2.0 2.5 0): four lanes along, then two across behind the far end, 166 s, no "failed to make
+progress", and nothing planned beyond the door. The camera saw 40 % of the floor. The rest is the price of
+the arm: the robot only turns where 1.25 m is free all round, so a strip about 0.85 m wide along every wall
+and the floor close around furniture stay out of reach. Not for a room with tables: the lidar band ends at
+0.6 m, so a table top at arm height is not seen, and the floor between two table legs looks free.
 
 Live SLAM needs `check_min_dist_and_heading_precisely: true` (`auto_session.sh` sets it). With the
 lab's `false` SLAM Toolbox waits for 9 cm of travel and the turn on the spot maps nothing (13 m² before

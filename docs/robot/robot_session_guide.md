@@ -50,6 +50,7 @@ bash governor_up.sh 0.5     # depth hazard node + speed governor + /scan_fixed; 
 LENGTH=5 WIDTH=5 bash auto_session.sh hall dry   # live map, turn, plan the lanes, print them
                             # start with 1.25 m free all round: the arm's camera reaches 1.05 m ahead
 LENGTH=5 WIDTH=5 bash auto_session.sh hall       # ... and sweep them, recorded, live page on :8000
+ROOM=1 bash auto_session.sh lab                  # the whole room, then again over what it had not seen
 ```
 
 Recordings go to the SSD when it is plugged in (`/mnt/ssd/silvanus_bags`), otherwise to
