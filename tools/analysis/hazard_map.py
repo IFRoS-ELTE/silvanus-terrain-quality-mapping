@@ -169,13 +169,13 @@ def camera_pass(bag, t_start, path, T_bd, T_bc, seg):
     Kd = Kc = prev = col = None
     rng, n, last_crack = np.random.default_rng(0), 0, -9.0
     dets, unev, cracks, planes = [], [], {}, []
-    stats = dict(frames=0, skipped=0, crack_frames=0, crack_px=0, crack_kept=0)
+    stats = dict(frames=0, skipped=0, outside_colour=0, crack_frames=0, crack_px=0, crack_kept=0)
     while r.has_next():
         tp, data, st = r.read_next(); t = st * 1e-9 - t_start
         if tp == DINFO and Kd is None:
             m = deserialize_message(data, CameraInfo); Kd = (m.k[0], m.k[4], m.k[2], m.k[5])
         if tp == CINFO and Kc is None:
-            m = deserialize_message(data, CameraInfo); Kc = (m.k[0], m.k[4], m.k[2], m.k[5])
+            m = deserialize_message(data, CameraInfo); Kc = (m.k[0], m.k[4], m.k[2], m.k[5]); csize = (m.width, m.height)
         if tp == COLOR:
             col = data
         if tp != DEPTH or Kd is None:
@@ -210,6 +210,10 @@ def camera_pass(bag, t_start, path, T_bd, T_bc, seg):
         thresh = max(THRESH, K_ROUGH * u_mm / 1000.0)
         for h in gp.find_hazards(cloud, valid, resid, nrm, d, thresh, MIN_AREA, Kd[0], Kd[1], max_height=MAX_HEIGHT):
             if h["peak_mm"] > MAX_HEIGHT * 1000:
+                continue
+            # only where the colour camera sees it too: the depth image's outer band gives false bumps
+            if Kc is not None and not gp.in_view(T_cd[:3, :3] @ np.array(h["centroid"]) + T_cd[:3, 3], Kc, csize):
+                stats["outside_colour"] += 1
                 continue
             pb = (T_bd @ np.r_[h["centroid"], 1.0])[:3]
             wx, wy = to_world(path, t, pb)

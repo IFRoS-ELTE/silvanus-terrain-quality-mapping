@@ -386,7 +386,8 @@ function renderList() {
       <svg class="glyph" viewBox="-11 -11 22 22" aria-hidden="true">${glyph(h)}</svg>
       <span class="what"><b>${title(h)}</b> <span class="num">${size(h)}</span><span class="loc">${h.route_m} m${h.side === "on the path" ? ", wheel track" : `, ${h.side}`}${h.surface ? " · " + h.surface : ""}</span></span>
       <span class="id">${h.id}</span></button></li>`).join("")
-    : `<li class="more">Nothing in this view. Switch on low priority to see the small ones.</li>`;
+    : D.hazards.length ? `<li class="more">Nothing in this view. Switch on low priority to see the small ones.</li>`
+    : `<li class="more">No bumps, holes or cracks found on this run.</li>`;
   $("#list").querySelectorAll(".row").forEach(b => b.onclick = () => select(b.dataset.id, true));
 }
 function renderDetail() {
@@ -394,8 +395,9 @@ function renderDetail() {
   if (!h) {
     const top = D.hazards.filter(x => x.priority === "high").length;
     $("#detail").innerHTML = `<div class="empty"><b>${RUNS.find(r => r.id === run).name}</b>
-      ${top ? `${top} high-priority item${top > 1 ? "s" : ""} on this run.` : "Nothing high priority on this run."}
-      Pick an item in the work list or on the map to see its photo, size and where to find it.</div>`;
+      ${!D.hazards.length ? "The floor is clear: no bumps, holes or cracks."
+        : `${top ? `${top} high-priority item${top > 1 ? "s" : ""} on this run.` : "Nothing high priority on this run."}
+      Pick an item in the work list or on the map to see its photo, size and where to find it.`}</div>`;
     return;
   }
   const photo = h.crop ? `<img src="runs/${run}/${h.crop}${D.live ? "?t=" + D.stamp : ""}" alt="${title(h)} ${h.id}">`

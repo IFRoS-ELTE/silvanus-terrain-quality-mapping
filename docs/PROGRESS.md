@@ -330,8 +330,19 @@ hovered) and its position by up to 10 cm. Now:
   skid-steer robot turning on the spot shakes by itself. The tape-measured run 1447 is unchanged (block
   1.88 and wooden block 0.81 felt, foam strips not)
 
-The one item left is a 13 mm bump the wheels felt at 0.23 m/s (jolt 0.77, just over the 0.75 limit), seen
-only at the edge of the depth image, with no colour photo: worth a look on site.
+- a depth hazard counts only where the colour camera sees it too (`ground_probe.in_view`, in the live
+  node and offline). The page still had three 10-13 mm "bumps" with no photo, and they were what the
+  governor slowed the robot for, six times, on that run. All three sat in the outer band of the depth
+  image (90° wide against 56° for colour), two in its top right corner and one at its left edge, where a
+  flat floor reads 5-12 mm high; the colour camera saw plain tile. One was "felt" only because a wheel
+  crossed that spot during a 0.77 jolt, just over the 0.75 limit. The colour view still reaches 0.42 m
+  to each side, past the outer edge of the tyres at 0.35 m. Replayed through the live node the sweep now
+  gives no slow-downs, and the tape-measured run keeps its five objects, felt as before (the foam block
+  slows the robot and is felt at 1.81 m/s²); what it loses there are things 0.6-0.7 m beside the path,
+  mostly the table legs. Outdoors about half the items on the 1548 and 1628 pages were seen only in that band.
+
+The page of this run now lists nothing: 0 m of cracks, no bumps or holes. The orange stretch is where the
+governor slowed the robot during the run, for those three false bumps.
 
 ![inspection page of the sweep](media/inspection_sweep_1829.jpg)
 

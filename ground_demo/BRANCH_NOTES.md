@@ -60,6 +60,14 @@ Its edge produces flying pixels that were read as ~100 mm bumps and false holes.
 `robot_mask_d435_gripper.png` (black = robot, 15 px margin) is applied by the node;
 it was made from pixels with no depth in more than 80 % of 913 frames from 4 bags.
 
+**Hazards count only inside the colour camera's view** (`in_view`, 20 px in from
+the edge of the colour image). The depth image is wider, 90 x 59 degrees against
+56 x 43, and in its outer band a flat floor reads 5-12 mm high: on the corridor
+sweep of 2026-10-27 that gave three false 10-13 mm bumps on plain tile, and the
+speed governor slowed for them six times. The colour view still covers the wheel
+tracks. The node takes the colour intrinsics from `colour_info_topic` and uses the
+whole depth image until they arrive (or with an empty string).
+
 The residual field is **median filtered 5x5** before anything is measured.
 Depth noise is independent per pixel, so this removes most of it while leaving
 real steps intact. It takes the flat-ground noise floor from 4.2 mm to 1.1 mm
