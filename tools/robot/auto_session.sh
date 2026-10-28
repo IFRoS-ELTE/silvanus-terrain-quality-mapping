@@ -13,6 +13,7 @@
 #
 #   LENGTH=5 WIDTH=4 bash ~/auto_session.sh hall
 #   ROOM=1 bash ~/auto_session.sh lab
+#   NO_SPIN=1 LENGTH=3 WIDTH=0 bash ~/auto_session.sh path     # no turn on the spot before it plans
 #
 # Needs: the stack (start_robot.sh), the arm in Pose B (arm_to_pose.py), the robot facing the area,
 # ~/nav_robot/nav2_robot_governor.yaml, ~/auto_sweep.py, ~/lane_planner.py, ~/governor_up.sh,
@@ -28,6 +29,8 @@ if [ -n "$ROOM" ]; then
 else
     AREA="--length $LENGTH --width $WIDTH"; AREA_TEXT="${LENGTH} m ahead x ${WIDTH} m across"; MAX_S=900
 fi
+# NO_SPIN=1: plan from what the lidar sees standing still, without the turn on the spot first
+[ -n "${NO_SPIN:-}" ] && { AREA="$AREA --no-spin"; AREA_TEXT="$AREA_TEXT, no turn first"; }
 ROS="source /opt/ros/jazzy/setup.bash && source /opt/robot/setup.bash"
 D="sudo docker exec silvanus"
 for f in ~/nav_robot/nav2_robot_governor.yaml ~/auto_sweep.py ~/lane_planner.py ~/governor_up.sh ~/record_session.sh \
