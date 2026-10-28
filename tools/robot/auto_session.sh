@@ -35,8 +35,9 @@ for f in ~/nav_robot/nav2_robot_governor.yaml ~/auto_sweep.py ~/lane_planner.py 
     [ -f "$f" ] || { echo "missing $f - copy it from the laptop first"; exit 1; }
 done
 sudo docker ps --format '{{.Names}}' | grep -qx silvanus || { echo "the stack is not running - run start_robot.sh first"; exit 1; }
-$D bash -c "$ROS && ros2 pkg prefix slam_toolbox nav2_regulated_pure_pursuit_controller nav2_rotation_shim_controller" > /dev/null \
-    || { echo "slam_toolbox or the Nav2 controllers are missing in the container"; exit 1; }
+for p in slam_toolbox nav2_regulated_pure_pursuit_controller nav2_rotation_shim_controller; do     # one at a time
+    $D bash -c "$ROS && ros2 pkg prefix $p" > /dev/null 2>&1 || { echo "$p is missing in the container"; exit 1; }
+done
 
 echo "1/6 hazard node, speed governor and /scan_fixed"
 $D pkill -INT -f "[b]ringup_launch|[n]avigation_launch|[n]av2_container|[o]nline_async_launch|[a]sync_slam_toolbox"
