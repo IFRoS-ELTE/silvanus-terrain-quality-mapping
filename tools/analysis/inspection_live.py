@@ -19,7 +19,7 @@ import argparse, json, math, os, sys, time
 import cv2
 import numpy as np
 import rclpy
-from nav_msgs.msg import OccupancyGrid
+from nav_msgs.msg import OccupancyGrid, Odometry
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from rclpy.time import Time
@@ -74,10 +74,13 @@ class Live(Node):
         self.ground = self.best = None
         self.path, self.mode, self.map, self.haz, self.crops = [], None, None, {}, {}
         self.last_frame = 0.0
+        self.vw = (0.0, 0.0)              # forward speed and turn rate from /odom
         self.create_subscription(CameraInfo, a.info_topic, self.on_info, qos_profile_sensor_data)
         self.create_subscription(Image, a.image_topic, self.on_image, qos_profile_sensor_data)
         self.create_subscription(String, "/governor/state", lambda m: setattr(self, "mode", json.loads(m.data)["mode"]), 10)
         self.create_subscription(String, "/governor/hazards", self.on_hazards, 10)
+        self.create_subscription(Odometry, "/odom", lambda m: setattr(
+            self, "vw", (m.twist.twist.linear.x, m.twist.twist.angular.z)), qos_profile_sensor_data)
         self.create_subscription(OccupancyGrid, "/map", lambda m: setattr(self, "map", m),
                                  QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
                                             durability=DurabilityPolicy.TRANSIENT_LOCAL))
@@ -143,10 +146,15 @@ class Live(Node):
                 return
             self.x0, self.x1, self.y0, self.y1, old = nx0, nx1, ny0, ny1, (self.ground, self.best, self.ox0, self.oy1)
         W, H = int(math.ceil((self.x1 - self.x0) / RES)), int(math.ceil((self.y1 - self.y0) / RES))
+        if self.ground is not None:
+            # the old canvas sits on whole cells of the new one, and the new one is never a cell too
+            # small for it after rounding (it crashed the node when the canvas grew, 2026-10-28)
+            c0, r0 = int(round((old[2] - self.x0) / RES)), int(round((self.y1 - old[3]) / RES))
+            self.x0, self.y1 = old[2] - c0 * RES, old[3] + r0 * RES
+            h, w = old[1].shape
+            W, H = max(W, c0 + w), max(H, r0 + h)
         ground, best = np.full((H, W, 3), 238, np.uint8), np.full((H, W), np.inf, np.float32)
         if self.ground is not None:
-            c0, r0 = int(round((old[2] - self.x0) / RES)), int(round((self.y1 - old[3]) / RES))
-            h, w = old[1].shape
             ground[r0:r0 + h, c0:c0 + w], best[r0:r0 + h, c0:c0 + w] = old[0], old[1]
         self.ground, self.best, self.W, self.H, self.ox0, self.oy1 = ground, best, W, H, self.x0, self.y1
 
@@ -171,12 +179,17 @@ class Live(Node):
         inb = (px >= 0) & (px < self.W) & (py >= 0) & (py < self.H)
         img = np.frombuffer(m.data, np.uint8).reshape(m.height, m.width, -1)[:, :, :3]
         rgb = img if m.encoding == "rgb8" else img[:, :, ::-1]
-        u, v, w = self.uv[ok][inb, 0], self.uv[ok][inb, 1], self.wgt[ok][inb]
+        u, v_, w = self.uv[ok][inb, 0], self.uv[ok][inb, 1], self.wgt[ok][inb]
         px, py = px[inb], py[inb]
-        better = w < self.best[py, px]
-        self.ground[py[better], px[better]] = rgb[v[better], u[better]]
-        self.best[py[better], px[better]] = w[better]
         self.photo(rgb, M)
+        # the floor only from frames taken while driving, as in inspection_map.py: while the robot turns
+        # on the spot its heading in the map lags, and the frames land at the wrong angle (2026-10-28)
+        v, w_ = self.vw
+        if v < 0.05 or abs(w_) > 0.15 + v:
+            return
+        better = w < self.best[py, px]
+        self.ground[py[better], px[better]] = rgb[v_[better], u[better]]
+        self.best[py[better], px[better]] = w[better]
 
     def photo(self, rgb, M):
         """Keep, per hazard, the frame where it sits nearest the image centre, cut out around it."""

@@ -143,6 +143,32 @@ def plan(grid, resolution, origin, pose, length=5.0, width=5.0, start=0.3, side=
     return waypoints, order
 
 
+def add_scan(grid, resolution, origin, pose, ranges, angle_min, angle_increment, range_max, no_return=4.0):
+    """The grid with the floor one lidar scan sees marked free, and its hits occupied.
+
+    SLAM Toolbox marks a cell free only once min_pass_through beams have crossed it, so from one spot
+    the floor a few metres out stays unknown between the beams, and the planner counts unknown as a
+    wall. The scan itself says more: everything between the lidar and each beam's hit is open. pose is
+    the scan frame's (x, y, yaw) in the map; a beam with no return counts as open for no_return m."""
+    r = np.asarray(ranges, float)
+    hit = np.isfinite(r) & (r < range_max)
+    r = np.where(hit, r, min(no_return, range_max))
+    a = angle_min + np.arange(len(r)) * angle_increment + pose[2]
+    c = (pose[0] + r * np.cos(a) - origin[0]) / resolution
+    w = (pose[1] + r * np.sin(a) - origin[1]) / resolution
+    rc = ((pose[0] - origin[0]) / resolution, (pose[1] - origin[1]) / resolution)
+    poly = np.stack([c, w], 1)
+    if len(r) * abs(angle_increment) < 2 * math.pi - 2 * abs(angle_increment):     # not all round: a fan from the lidar
+        poly = np.vstack([rc, poly])
+    seen = np.zeros(grid.shape, np.uint8)
+    cv2.fillPoly(seen, [np.round(poly).astype(np.int32)], 1)
+    out = grid.copy()
+    out[(seen > 0) & (out < 50)] = 0
+    ok = hit & (c >= 0) & (c < grid.shape[1]) & (w >= 0) & (w < grid.shape[0])
+    out[w[ok].astype(int), c[ok].astype(int)] = 100
+    return out
+
+
 def seen_mask(shape, resolution, origin, points, radius=SEE_RADIUS):
     """Cells within radius of any of the camera's points [(x, y)] on the floor: what it has covered."""
     mark = np.zeros(shape, bool)

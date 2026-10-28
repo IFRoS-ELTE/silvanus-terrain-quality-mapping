@@ -446,6 +446,8 @@ async function load(id) {
     $("#loading").textContent = "This run could not be loaded."; return;
   }
   $("#rules").textContent = `${D.rules.class}. Priority: ${D.rules.priority}. Rough ground: ${D.rules.rough_ground}.`;
+  // live, everything the camera finds is shown: a block not crossed yet is only "low" until the wheels feel it
+  if (D.live) $("#showlow").checked = true;
   renderStats(); renderMap(); renderDetail(); renderList(); fit(false);
   if (D.live) liveTimer = setInterval(refresh, 2000);
 }

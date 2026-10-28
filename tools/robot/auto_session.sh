@@ -3,17 +3,17 @@
 #
 # Run on the robot. The autonomous version: no saved map, nobody driving.
 #   live SLAM (lidar map built as the robot moves) + Nav2 + the speed governor
-#   the robot turns once on the spot, fits lanes into the free floor it found, up to LENGTH m ahead
+#   the robot fits lanes into the free floor the lidar sees, up to LENGTH m ahead
 #   and WIDTH m across (default 5 x 5), and sweeps them; the camera finds bumps and holes, the
 #   governor slows to 0.2 m/s so the IMU can feel them and stops for tall ones and obstacles.
-# Everything is recorded, and the map is saved next to the recording. With "dry" it turns and
+# Everything is recorded, and the map is saved next to the recording. With "dry" it
 # plans only: it prints the lanes it would drive, without driving or recording.
 # ROOM=1 sweeps the whole room instead of LENGTH x WIDTH: all the open floor it can reach without
 # passing a door, then again over what the map gained and the camera has not seen (up to 3 passes).
 #
 #   LENGTH=5 WIDTH=4 bash ~/auto_session.sh hall
 #   ROOM=1 bash ~/auto_session.sh lab
-#   NO_SPIN=1 LENGTH=3 WIDTH=0 bash ~/auto_session.sh path     # no turn on the spot before it plans
+#   SPIN=1 LENGTH=3 WIDTH=0 bash ~/auto_session.sh path        # one turn on the spot before it plans
 #
 # Needs: the stack (start_robot.sh), the arm in Pose B (arm_to_pose.py), the robot facing the area,
 # ~/nav_robot/nav2_robot_governor.yaml, ~/auto_sweep.py, ~/lane_planner.py, ~/governor_up.sh,
@@ -29,8 +29,8 @@ if [ -n "$ROOM" ]; then
 else
     AREA="--length $LENGTH --width $WIDTH"; AREA_TEXT="${LENGTH} m ahead x ${WIDTH} m across"; MAX_S=900
 fi
-# NO_SPIN=1: plan from what the lidar sees standing still, without the turn on the spot first
-[ -n "${NO_SPIN:-}" ] && { AREA="$AREA --no-spin"; AREA_TEXT="$AREA_TEXT, no turn first"; }
+# SPIN=1: turn once on the spot before planning (not needed: the lidar sees all round)
+[ -n "${SPIN:-}" ] && { AREA="$AREA --spin"; AREA_TEXT="$AREA_TEXT, one turn first"; }
 ROS="source /opt/ros/jazzy/setup.bash && source /opt/robot/setup.bash"
 D="sudo docker exec silvanus"
 for f in ~/nav_robot/nav2_robot_governor.yaml ~/auto_sweep.py ~/lane_planner.py ~/governor_up.sh ~/record_session.sh \
@@ -51,11 +51,12 @@ echo "2/6 live SLAM on /scan_fixed"
 $D mkdir -p /tmp/nav_robot
 sudo docker cp ~/nav_robot/. silvanus:/tmp/nav_robot/ > /dev/null
 for f in auto_sweep.py lane_planner.py; do sudo docker cp ~/$f silvanus:/tmp/nav_robot/$f > /dev/null; done
-# the lab's SLAM settings, on the floor-free scan, and also taking scans while the robot turns on the spot
+# the lab's SLAM settings, on the floor-free scan, taking scans while the robot turns on the spot, and
+# one beam enough to call a cell free (the lab's 2 leaves the floor a few metres out unknown)
 # (with check_min_dist_and_heading_precisely false it waits for 9 cm of travel and the turn maps nothing)
 $D bash -c "$ROS && sed -e 's|scan_topic: /scan|scan_topic: /scan_fixed|' \
     -e 's|check_min_dist_and_heading_precisely: false|check_min_dist_and_heading_precisely: true|' \
-    -e 's|use_sim_time: true|use_sim_time: false|' \
+    -e 's|use_sim_time: true|use_sim_time: false|' -e 's|min_pass_through: 2|min_pass_through: 1|' \
     \$(ros2 pkg prefix scout_xarm_navigation)/share/scout_xarm_navigation/config/slam_toolbox.yaml > /tmp/nav_robot/slam_live.yaml"
 sudo docker exec -d silvanus bash -c "$ROS && ros2 launch slam_toolbox online_async_launch.py \
 slam_params_file:=/tmp/nav_robot/slam_live.yaml use_sim_time:=false autostart:=true > /tmp/nav_robot/slam.log 2>&1"
@@ -70,7 +71,7 @@ echo "    Nav2 is up"
 read -r -p "4/6 In RViz the map should start to appear around the robot. Area: ${AREA_TEXT}. Enter to go on, Ctrl-C to stop: "
 
 if [ "$DRY" = dry ]; then
-    echo "5/6 dry run: turn on the spot and plan, no driving, no recording"
+    echo "5/6 dry run: plan only, no driving, no recording"
     sudo docker exec -it silvanus bash -c "$ROS && cd /tmp/nav_robot && python3 auto_sweep.py \
 $AREA --dry --log /tmp/nav_robot/auto.csv"
     echo "SLAM and Nav2 keep running. Plan: /tmp/nav_robot/auto_plan.json in the container"
@@ -88,7 +89,7 @@ echo "    recording $BAG"
 [ -f ~/live_web.sh ] && bash ~/live_web.sh
 sleep 3
 
-echo "6/6 turn, plan and sweep: stand at the e-stop"
+echo "6/6 plan and sweep: stand 1.5 m away with the remote, not in front"
 sudo docker exec -it silvanus bash -c "$ROS && cd /tmp/nav_robot && python3 auto_sweep.py \
 $AREA --log /bags/${BAG}_auto.csv"
 

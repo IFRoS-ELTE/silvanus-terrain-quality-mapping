@@ -55,14 +55,17 @@ python3 coverage_sweep.py --x0 3.875 --y0 -0.294 --yaw 66.34 --length 5 --width 
 ```
 
 Autonomous, with live SLAM and no saved map. The robot stands where the sweep should start, facing
-the area, with 1.25 m free all round (it refuses to turn otherwise); it turns once on the spot, fits
-lanes 0.8 m apart into the free floor it has mapped and sweeps them. A lane keeps 0.6 m from walls and
+the area; it fits lanes 0.8 m apart into the free floor it sees and sweeps them. The free floor is the
+live map plus the latest lidar scan itself (`lane_planner.add_scan`): standing still, SLAM Toolbox leaves
+the floor a few metres out unknown between the beams, and the planner counts unknown as a wall (14 m²
+free in simulation from one spot, 53 m² with the scan added). There is no turn on the spot first: the
+lidar sees all round. `--spin` (`SPIN=1`) adds one, with 1.25 m free all round. A lane keeps 0.6 m from walls and
 unknown space along its length; its ends, where the robot turns with the arm out, need 1.25 m free all
 round and are pulled in until they have it; lanes shorter than 1 m are dropped, and the pattern is shifted
 sideways if that fits more. `sweep_session.sh` plans the same way on the saved map (`--no-spin`):
 
 ```bash
-python3 auto_sweep.py --length 5 --width 5          # --dry: turn and plan only
+python3 auto_sweep.py --length 5 --width 5          # --dry: plan only
 python3 auto_sweep.py --room                        # the whole room
 python3 -m pytest test_lane_planner.py
 ```
@@ -84,9 +87,12 @@ the arm: the robot only turns where 1.25 m is free all round, so a strip about 0
 and the floor close around furniture stay out of reach. Not for a room with tables: the lidar band ends at
 0.6 m, so a table top at arm height is not seen, and the floor between two table legs looks free.
 
-Live SLAM needs `check_min_dist_and_heading_precisely: true` (`auto_session.sh` sets it). With the
-lab's `false` SLAM Toolbox waits for 9 cm of travel and the turn on the spot maps nothing (13 m² before
-and after a full turn in simulation, 70 m² with `true`).
+Live SLAM needs `check_min_dist_and_heading_precisely: true` and `min_pass_through: 1`
+(`auto_session.sh` sets both). With the lab's `false` SLAM Toolbox waits for 9 cm of travel and a turn on
+the spot maps nothing (13 m² before and after a full turn in simulation, 70 m² with `true`); with the
+lab's 2 a cell is free only once two beams have crossed it, which from one spot leaves the floor beyond
+about 1.5 m unknown. On the robot on 2026-10-28 that gave "no free floor for a lane" on open floor, and
+the turn on the spot meant to fill it in was cut short whenever someone stood inside the arm's circle.
 
 Tested in simulation (`fake_robot.py` on the `indoor_loop3_1316` map, 5 % turn error on the wheels):
 the corridor sweep of 3 lanes x 5 m in 78 s, and the autonomous one with the arm counted: a 5 x 5 m

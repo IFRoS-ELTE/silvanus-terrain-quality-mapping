@@ -3,8 +3,9 @@
 
 Needs live SLAM (map -> odom, /map) and Nav2 running, and the robot standing where the sweep should
 start, facing the area. Then:
-  1. it turns once on the spot, so the lidar maps everything around it (only with 1.25 m free all
-     round: the arm's camera reaches 1.05 m ahead)
+  1. it adds the floor the latest lidar scan sees to the map (lane_planner.add_scan): from one spot
+     SLAM's map stays unknown between the beams a few metres out. With --spin it first turns once
+     on the spot as well (only with 1.25 m free all round: the arm's camera reaches 1.05 m ahead)
   2. it fits lanes into the free floor of the live map, up to --length m ahead and --width m across
      (navigation/lane_planner.py: at least 0.6 m from walls and unknown space)
   3. it drives them through Nav2 (FollowWaypoints, every corner facing the next leg)
@@ -17,7 +18,7 @@ sweeps the floor its camera has not seen yet, along or across, up to --rounds pa
 nothing is left.
 
     python3 auto_sweep.py --length 5 --width 5            # plan, then sweep
-    python3 auto_sweep.py --length 5 --width 5 --dry      # turn and plan only, print the lanes
+    python3 auto_sweep.py --length 5 --width 5 --dry      # plan only, print the lanes
     python3 auto_sweep.py --room                          # the whole room
 """
 import argparse, csv, json, math, os, sys, time
@@ -28,6 +29,8 @@ from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from rclpy.time import Time
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import OccupancyGrid
+from rclpy.qos import qos_profile_sensor_data
+from sensor_msgs.msg import LaserScan
 from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 from tf2_ros import Buffer, TransformListener
 
@@ -59,7 +62,8 @@ def main():
     ap.add_argument("--start", type=float, default=0.3, help="where the lanes begin, m ahead of the robot")
     ap.add_argument("--room", action="store_true", help="the whole room instead of --length x --width")
     ap.add_argument("--rounds", type=int, default=3, help="with --room: passes at most, each over floor not yet seen")
-    ap.add_argument("--no-spin", action="store_true", help="skip the turn on the spot")
+    ap.add_argument("--spin", action="store_true", help="turn once on the spot before planning")
+    ap.add_argument("--no-spin", action="store_true", help="(the default; kept for older scripts)")
     ap.add_argument("--dry", action="store_true", help="plan and print, do not drive")
     ap.add_argument("--log", default="auto_sweep.csv")
     a, _ = ap.parse_known_args()
@@ -70,6 +74,7 @@ def main():
     grid = {}
     qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.TRANSIENT_LOCAL)
     nav.create_subscription(OccupancyGrid, "/map", lambda m: grid.update(m=m), qos)
+    nav.create_subscription(LaserScan, "/scan_fixed", lambda s: grid.update(scan=s), qos_profile_sensor_data)
     log = nav.get_logger()
 
     t0 = time.time()
@@ -79,13 +84,13 @@ def main():
         log.error("no /map after 30 s: is SLAM running?"); sys.exit(1)
     start = robot_pose(nav, buf)
 
-    if not a.no_spin:
+    if a.spin:
         m0 = grid["m"]
         g0 = np.array(m0.data, dtype=np.int16).reshape(m0.info.height, m0.info.width)
         near = lp.nearest_obstacle(g0, m0.info.resolution, (m0.info.origin.position.x, m0.info.origin.position.y), start[:2])
         if near < lp.TURN_CLEARANCE:
             log.error(f"something {near:.2f} m from the robot centre: turning on the spot with the arm out needs "
-                      f"{lp.TURN_CLEARANCE} m all round. Move the robot to open floor, or use --no-spin.")
+                      f"{lp.TURN_CLEARANCE} m all round. Move the robot to open floor, or leave out --spin.")
             sys.exit(1)
         log.info("turning once on the spot to map the surroundings")
         nav.spin(spin_dist=2 * math.pi, time_allowance=90)
@@ -105,6 +110,16 @@ def main():
         g = np.array(m.data, dtype=np.int16).reshape(m.info.height, m.info.width)
         origin = (m.info.origin.position.x, m.info.origin.position.y)
         here = robot_pose(nav, buf)
+        s = grid.get("scan")
+        if s is not None:
+            try:
+                tr = buf.lookup_transform("map", s.header.frame_id, Time(), timeout=Duration(seconds=1.0))
+                q = tr.transform.rotation
+                sp = (tr.transform.translation.x, tr.transform.translation.y,
+                      math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z)))
+                g = lp.add_scan(g, m.info.resolution, origin, sp, s.ranges, s.angle_min, s.angle_increment, s.range_max)
+            except Exception as e:
+                log.warn(f"latest scan not used: {e}")
         seen = lp.seen_mask(g.shape, m.info.resolution, origin, camera) if camera else None
         # lanes along the heading the robot was placed with, from where it stands now; later passes
         # also try lanes across, which reach the ends of the earlier lanes and the floor beside furniture

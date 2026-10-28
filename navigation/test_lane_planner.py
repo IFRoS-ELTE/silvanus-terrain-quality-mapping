@@ -74,6 +74,29 @@ class PlanTest(unittest.TestCase):
         self.assertEqual(lp.plan(g, RES, (0.0, 0.0), (1.0, 1.0, 0.0)), ([], []))
 
 
+class ScanTest(unittest.TestCase):
+    def test_one_scan_opens_the_floor_it_sees(self):
+        g = np.full((120, 200), -1, np.int16)          # 10 x 6 m, nothing mapped yet
+        n = 720
+        ang = -math.pi + np.arange(n) * (2 * math.pi / n)
+        # robot at (2, 3) in a 10 x 6 m room: distance to the walls along each beam
+        ranges = [min(((10 - 2) / c if c > 1e-9 else np.inf) if c >= 0 else -2 / c,
+                      ((6 - 3) / s if s > 1e-9 else np.inf) if s >= 0 else -3 / s) - 0.05
+                  for c, s in zip(np.cos(ang), np.sin(ang))]
+        out = lp.add_scan(g, RES, (0.0, 0.0), (2.0, 3.0, 0.0), ranges, -math.pi, 2 * math.pi / n, 20.0)
+        self.assertGreater((out == 0).sum() * RES * RES, 50)       # most of the 60 m2
+        self.assertEqual(out[60, 180], 0)                         # free 7 m ahead
+        _, lanes = lp.plan(out, RES, (0.0, 0.0), (2.0, 3.0, 0.0), length=3, width=0)
+        self.assertEqual(len(lanes), 1)
+
+    def test_a_scan_never_frees_a_wall(self):
+        g = room()
+        g[:, 100:104] = 100                              # a wall at x = 5 m
+        ranges = [2.9] * 360                             # the scan only reaches 2.9 m: it cannot see past it
+        out = lp.add_scan(g, RES, (0.0, 0.0), (2.0, 3.0, 0.0), ranges, -math.pi, 2 * math.pi / 360, 20.0)
+        self.assertTrue((out[:, 100:104] == 100).all())
+
+
 class WholeRoomTest(unittest.TestCase):
     def lane_metres(self, lanes):
         return sum(math.dist(a, b) for a, b in lanes)
