@@ -24,7 +24,7 @@ L=~/workspaces/scout_xarm_ros2/src/scout_xarm_navigation/config/nav2_params.yaml
 python3 make_nav2_robot.py $L nav2_robot.yaml --max-speed 0.2 --initial-pose 3.037 -3.203 66.34
 # sweeps: through the speed governor, Pure Pursuit, looser goal check
 python3 make_nav2_robot.py $L nav2_robot_governor.yaml --max-speed 0.35 --initial-pose 3.037 -3.203 66.34 \
-    --cmd-vel-out cmd_vel_in --goal-tolerance 0.35 30 --controller rpp --arm-footprint
+    --cmd-vel-out cmd_vel_in --goal-tolerance 0.35 30 --controller rpp --arm-footprint --wait-recovery
 ```
 
 The initial pose is the start tape of the `indoor_loop3_1316` map. For sweeps three things differ from
@@ -36,6 +36,10 @@ the lab's settings, each found on the first sweep on 2026-10-27, where the robot
   a goal it cannot line up with; the shim turns on the spot to face the path and the goal heading
 - every corner faces the next leg (`coverage_sweep.lanes`, `lane_planner.plan`): turn on the spot,
   drive straight, turn. Facing along the lane, the next lane start sat beside the robot.
+
+`--wait-recovery` takes the turn on the spot (90°) and the 0.3 m reverse out of Nav2's recovery: when
+stuck it only clears its costmaps and waits. Blind, with the arm out, those moves are not safe; on
+2026-10-28 the robot turned that way after the governor stopped it.
 
 `--arm-footprint` adds the arm in Pose B to the robot's outline: the camera housing is 1.05 m ahead of
 the centre, so turning on the spot sweeps a circle of about 1 m, and the costmaps, the controller and the

@@ -34,6 +34,11 @@ ap.add_argument("--controller", choices=["mppi", "rpp"], default="mppi",
                 help="rpp: Regulated Pure Pursuit inside the Rotation Shim, which turns on the spot to face the path "
                      "and to the goal heading. For lane sweeps: the lab's forward-only MPPI circles a goal it cannot "
                      "line up with (robot 2026-10-27, and in tools/sim/fake_robot.py)")
+ap.add_argument("--wait-recovery", metavar="BT_XML_ON_ROBOT", nargs="?", const="/tmp/nav_robot/nav_to_pose_wait.xml",
+                help="when stuck, only clear the costmaps and wait, never turn on the spot or back up: Nav2's own "
+                     "recovery turns 90 deg and reverses 0.3 m blind, with the arm out (robot 2026-10-28, after the "
+                     "governor stopped it). Writes nav_to_pose_wait.xml next to OUT; the value is where the session "
+                     "scripts put it in the container")
 a = ap.parse_args()
 
 text = open(a.lab_params).read()
@@ -58,6 +63,16 @@ if a.arm_footprint:
     sub(r'footprint: "\[\[-0\.325, -0\.325\], \[-0\.325, 0\.325\], \[0\.325, 0\.325\], \[0\.46, 0\.0\], \[0\.325, -0\.325\]\]"',
         'footprint: "[[-0.325, -0.325], [-0.325, 0.325], [0.325, 0.325], [0.46, 0.14], [1.05, 0.14], '
         '[1.05, -0.14], [0.46, -0.14], [0.325, -0.325]]"', 2)
+if a.wait_recovery:
+    import os
+    bt = open("/opt/ros/jazzy/share/nav2_bt_navigator/behavior_trees/navigate_to_pose_w_replanning_and_recovery.xml").read()
+    bt, n = re.subn(r"^\s*<(Spin|BackUp) [^>]*/>\n", "", bt, flags=re.M)
+    assert n == 2, f"expected the Spin and BackUp recoveries, removed {n}"
+    open(os.path.join(os.path.dirname(os.path.abspath(a.out)), "nav_to_pose_wait.xml"), "w").write(
+        "<!-- navigate_to_pose_w_replanning_and_recovery.xml without the Spin and BackUp recoveries "
+        "(navigation/make_nav2_robot.py --wait-recovery) -->\n" + bt)
+    sub(r"^bt_navigator:\n  ros__parameters:\n", f"bt_navigator:\n  ros__parameters:\n"
+        f"    default_nav_to_pose_bt_xml: {a.wait_recovery}\n", 1)
 if a.goal_tolerance:
     sub(r"xy_goal_tolerance: 0\.20", f"xy_goal_tolerance: {a.goal_tolerance[0]:.2f}", 1)
     sub(r"yaw_goal_tolerance: 0\.25", f"yaw_goal_tolerance: {math.radians(a.goal_tolerance[1]):.2f}", 1)
