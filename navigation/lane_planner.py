@@ -21,8 +21,8 @@ left out, so a second pass covers only what the map has gained.
 
 import math
 
+import cv2              # not scipy: the robot's container has OpenCV but no scipy
 import numpy as np
-from scipy import ndimage
 
 SPACING = 0.8        # m between lanes: the depth camera sees about 1.6 m across, so neighbours overlap
 CLEARANCE = 0.6      # m from the robot centre to any wall or unknown cell (half width 0.35 + margin)
@@ -39,7 +39,7 @@ def clearance_map(grid, resolution):
     """Distance (m) from every cell to the nearest occupied or unknown cell. grid: OccupancyGrid data
     as rows (row 0 = lowest y), -1 unknown, 0..100 occupied probability."""
     free = (grid >= 0) & (grid < 50)
-    return ndimage.distance_transform_edt(free) * resolution
+    return edt(free) * resolution
 
 
 def plan(grid, resolution, origin, pose, length=5.0, width=5.0, start=0.3, side=0.0,
@@ -58,7 +58,7 @@ def plan(grid, resolution, origin, pose, length=5.0, width=5.0, start=0.3, side=
     whole = length is None
     if whole:
         # the open floor connected to the robot; a door is narrower than 2 x clearance and cuts it off
-        lab, _ = ndimage.label(dist >= clearance)
+        _, lab = cv2.connectedComponents((dist >= clearance).astype(np.uint8), connectivity=4)
         r0, c0 = int((y - oy) / resolution), int((x - ox) / resolution)
         k = lab[r0, c0] if 0 <= r0 < lab.shape[0] and 0 <= c0 < lab.shape[1] else 0
         if k == 0:                     # the robot stands closer to a wall than that: the nearest open floor
@@ -153,7 +153,12 @@ def seen_mask(shape, resolution, origin, points, radius=SEE_RADIUS):
         mark[r[ok], c[ok]] = True
     if not mark.any():
         return mark
-    return ndimage.distance_transform_edt(~mark) * resolution <= radius
+    return edt(~mark) * resolution <= radius
+
+
+def edt(mask):
+    """Distance in cells from every True cell to the nearest False one (exact Euclidean)."""
+    return cv2.distanceTransform(mask.astype(np.uint8), cv2.DIST_L2, cv2.DIST_MASK_PRECISE).astype(float)
 
 
 def nearest_obstacle(grid, resolution, origin, xy):
