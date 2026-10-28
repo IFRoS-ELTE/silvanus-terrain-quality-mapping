@@ -17,7 +17,8 @@ for f in ~/inspection_live.py ~/inspection_viewer/index.html; do
 done
 $D bash -c "mkdir -p /bags/live_web/runs /tmp/nav_robot && rm -rf /bags/live_web/runs/live_prev && \
     { [ -d /bags/live_web/runs/live ] && mv /bags/live_web/runs/live /bags/live_web/runs/live_prev; true; }"
-sudo docker cp ~/inspection_viewer/index.html silvanus:/bags/live_web/index.html > /dev/null
+# through cat, not docker cp: docker cp sets the file's owner, which the exFAT SSD refuses
+sudo docker exec -i silvanus sh -c "cat > /bags/live_web/index.html" < ~/inspection_viewer/index.html
 sudo docker cp ~/inspection_live.py silvanus:/tmp/nav_robot/inspection_live.py > /dev/null
 sudo docker exec -d silvanus bash -c "$ROS && python3 /tmp/nav_robot/inspection_live.py --out /bags/live_web/runs/live \
     > /tmp/nav_robot/inspection_live.log 2>&1"
