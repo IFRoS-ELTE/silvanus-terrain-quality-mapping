@@ -371,6 +371,24 @@ the route with slow and stop stretches, and the governor's hazards with their fe
 `tools/robot/live_web.sh` serves it, and the laptop opens `http://192.168.1.102:8000`. Only these
 files cross the Wi-Fi. Checked by replaying `corridor_sweep_1829` as if it were live.
 
+**First autonomous sessions on the robot (28 October).** The stack, the hazard node, the governor,
+SLAM and Nav2 all came up from `auto_session.sh`, and the live page showed the floor and a 17 mm
+wooden block (32 x 7 cm, the right size). No lane was driven yet. What stopped it, each fixed and
+checked in simulation since:
+
+| on the robot | cause | fix |
+|---|---|---|
+| "no free floor for a lane" on open floor | SLAM Toolbox's `min_pass_through: 2`: from one spot the floor beyond about 1.5 m stays unknown, which the planner reads as a wall | `min_pass_through: 1`, and the planner adds the floor the latest scan sees (`lane_planner.add_scan`): 14 → 53 m² free from one spot in simulation |
+| the turn on the spot at the start stopped after a quarter turn | Nav2 cuts a turn short when anything is inside the arm's 1 m circle, here the person at the e-stop | no turn at all: the lidar sees all round (`--spin` keeps it as an option) |
+| the robot turned and reversed by itself after the governor stopped it | Nav2's own recovery: 90° turn and 0.3 m back, blind, with the arm out | `make_nav2_robot.py --wait-recovery`: clear the costmaps and wait only |
+| the block twice, tiles at odd angles on the live page | frames taken while turning, laid with a lagging heading | the live page lays only frames taken while driving, as the offline page does |
+| the block missing from the live page | a 17 mm bump not crossed yet is low priority, and low items were hidden | the live page shows them |
+| the live page did not start | `docker cp` cannot set a file's owner on the exFAT SSD | written through `cat` |
+| the planner did not start | no scipy in the robot's container | OpenCV instead |
+
+The live page node also crashed when its canvas grew by a rounding error of one pixel (found replaying
+`corridor_sweep_1829`); fixed.
+
 **Recording.** On the internal disk the recorder dropped up to 60 % of all messages while driving
 (gaps up to 3.5 s on every topic at once). Recorded to the SSD, the sweep kept the camera at 25
 frames a second. `start_robot.sh` now mounts the SSD by itself and recordings go there.
@@ -394,8 +412,9 @@ frames a second. `start_robot.sh` now mounts the SSD by itself and recordings go
 
 ## Next
 
-1. On the robot: the autonomous session indoors, with plates in the area, then the same outdoors
-   (live SLAM outside is still untested).
+1. On the robot: the autonomous session indoors with the 28 October fixes, one straight lane over
+   plates first (`LENGTH=3 WIDTH=0`), then the corridor, then the whole-room mode (`ROOM=1`) in a
+   room without tables; then the same outdoors (live SLAM outside is still untested).
 2. Crossing runs at 0.2, 0.3 and 0.4 m/s, so the felt test can depend on speed.
 3. Labelled outdoor runs with repeats (the week 4 gate).
 4. IMU roughness node with the frequency-band feature; EKF live.
