@@ -1,6 +1,6 @@
 # Progress
 
-Terrain quality and hazard mapping with Silvanus. State on 2026-10-27, against
+Terrain quality and hazard mapping with Silvanus. State on 2026-11-04, against
 the plan in [MILESTONES.md](MILESTONES.md). Data: [DATA.md](DATA.md).
 
 ---
@@ -50,8 +50,18 @@ the plan in [MILESTONES.md](MILESTONES.md). Data: [DATA.md](DATA.md).
 | EKF of wheels, IMU and GPS | config ready, tested offline, not live |
 | Terrain classifier on outdoor images | open |
 | Map layer: path, hazard markers | ✅ inspection page with the lidar map, the route and where the robot slowed (section 6) |
-| Started early, week 5: live view, the same pipeline live | the live page and the fully autonomous sweep (live SLAM, lanes planned by the robot) are written and checked in simulation and on a replay; not yet on the robot |
+| Started early, week 5: live view, the same pipeline live | the live page and the fully autonomous sweep (live SLAM, lanes planned by the robot) are written and checked in simulation and on a replay; first try on the robot 28 Oct (section 6) |
 | **Gate:** labelled outdoor dataset | not yet |
+
+### Week 5, 29 October - 4 November
+
+| Task | State |
+|---|---|
+| Full pipeline on one bag, on one laptop | ✅ `corridor_sweep_1829`: SLAM positions, the lidar map, the stitched floor, hazards and the governor's slow-downs on one page (section 6) |
+| The same, live on the robot | partly: on 28 Oct the stack, hazard node, governor, live SLAM, Nav2 and the live page all ran from `auto_session.sh`; no lane driven yet, the causes fixed and checked in simulation |
+| Book demo: approach, slow, cross, IMU spike, marker in class C | every part works live (27 Oct, teleop: slowed 0.3 → 0.2 m/s before plates, felt 10-74 mm); not yet in one autonomous run |
+| Live view: map, path, hazards, camera | ✅ on the robot 28 Oct, opened in the laptop's browser |
+| **Gate:** the headline demo end to end | not yet |
 
 ---
 

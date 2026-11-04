@@ -10,7 +10,7 @@ The short version: **the camera predicts, the IMU confirms.**
   <img src="docs/media/robot_left_side.jpg" width="70%" alt="Silvanus in the lab">
 </p>
 
-*Last updated 27 October 2026, week 4 of 8. Final presentation at the end of November.*
+*Last updated 4 November 2026, week 5 of 8. Final presentation at the end of November.*
 
 ---
 
@@ -30,8 +30,8 @@ The short version: **the camera predicts, the IMU confirms.**
 | 3 (15-21 Oct) | Zigzag coverage sweep | First sweep on the robot 27 Oct, Nav2 through the governor; its stall at a lane change is fixed and checked in simulation |
 | 3 | Speed governor: slow down so the IMU can feel a hazard, stop before obstacles | Live on the robot 27 Oct: slows to 0.2 m/s, feels 10-74 mm plates, stops for walls and tall objects |
 | 3 | Camera and IMU fused, hazard classes A/B/C | Done offline on our recordings (section 6), live in the governor |
-| 4 (22-28 Oct) | Fully autonomous: live map, lanes planned by the robot, sweep | Written and checked in simulation; first robot run next |
-| 4 | Inspection page updating live on the laptop | Written and checked on a replay of the sweep |
+| 4 (22-28 Oct) | Fully autonomous: live map, lanes planned by the robot, sweep | First robot try 28 Oct: everything starts from one script, but no lane was driven; the causes are fixed and checked in simulation |
+| 4 | Inspection page updating live on the laptop | Ran on the robot 28 Oct: the laptop showed the floor and a 17 mm wooden block |
 | 4 | Labelled outdoor runs with repeats | Open |
 
 Full plan to the end of November: [docs/MILESTONES.md](docs/MILESTONES.md).
@@ -200,8 +200,8 @@ The next step runs without a saved map and without a driver: live SLAM, one turn
 ## 8. Next weeks
 
 - **Week 3, done.** Crack U-Net in the robot's crack node with false-crack filters; camera and IMU fused into one map with the A/B/C classes; inspection map; speed governor, tested offline.
-- **Week 4, now.** Done at the robot: the scan fix, the indoor map with SLAM, Nav2 to goals, the speed governor live, a first sweep through it. Next at the robot: the autonomous session indoors with plates in the area, then outdoors; crossing runs at 0.2, 0.3 and 0.4 m/s to make the felt test depend on speed; labelled outdoor runs with repeats. Off the robot: crack model fine-tuned with our tile frames as "no crack"; RGB terrain classifier v1; IMU roughness node.
-- **Week 5.** Everything together, first on one bag and then live: the robot approaches a book, slows down by itself, crosses it, the IMU spike is logged and a confirmed marker appears on the map.
+- **Week 4, done.** At the robot: the scan fix, the indoor map with SLAM, Nav2 to goals, the speed governor live, a first sweep through it, a first try of the autonomous session with the live page.
+- **Week 5, now.** Everything together, first on one bag (done: the corridor sweep, section 6) and then live: the robot drives a lane by itself over a block, slows, crosses it, the IMU spike is logged and a confirmed marker appears on the live page. The parts all work on the robot; one autonomous run with all of them together is next. Still open from week 4: crossing runs at 0.2, 0.3 and 0.4 m/s, and labelled outdoor runs with repeats.
 - **Weeks 6-8.** Repeat runs, roughness vs speed, the camera unevenness vs IMU roughness comparison, hazard counts per class, the smallest hazard the robot feels, demo video and presentation.
 
 Every hazard will end up in one of three classes, which is the main result of the project:
