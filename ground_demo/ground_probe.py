@@ -243,6 +243,27 @@ def find_hazards(cloud, valid, resid, nrm, d, thresh, min_area_cm2, fx, fy,
     return out
 
 
+def in_view(p, k, size, margin=20.0):
+    """True if the point p (m, camera frame) lands inside an image with
+    intrinsics k = (fx, fy, ppx, ppy) and size (width, height), at least
+    `margin` pixels in from its edge.
+
+    Depth hazards count only where the colour camera also sees them. The depth
+    view is wider (90 x 59 degrees against 56 x 43 for colour) and its outer
+    band is where the depth is worst: on the corridor sweep of 2026-10-27 the
+    same 10-13 mm "bumps" came back at the same corner pixels from different
+    places on a plain floor, and the speed governor slowed for them six times.
+    With the arm in Pose B the colour view still reaches 0.42 m to each side,
+    past the outer edge of the tyres at 0.35 m, so nothing the wheels can touch
+    is lost, and every hazard that is kept has a photo.
+    """
+    x, y, z = p
+    if z <= 0:
+        return False
+    u, v = k[0] * x / z + k[2], k[1] * y / z + k[3]
+    return margin <= u <= size[0] - margin and margin <= v <= size[1] - margin
+
+
 # --------------------------------------------------------------------------
 # rendering
 # --------------------------------------------------------------------------

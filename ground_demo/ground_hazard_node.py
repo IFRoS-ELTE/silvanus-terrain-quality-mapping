@@ -53,7 +53,7 @@ from vision_msgs.msg import (BoundingBox3D, Detection3D, Detection3DArray,
                              ObjectHypothesisWithPose)
 from visualization_msgs.msg import Marker, MarkerArray
 
-from ground_probe import (deproject, find_hazards, fit_ground_plane,
+from ground_probe import (deproject, find_hazards, fit_ground_plane, in_view,
                           plane_basis, plane_pose, refine_plane)
 
 
@@ -86,6 +86,12 @@ class GroundHazardNode(Node):
                                "/camera/camera/depth/image_rect_raw")
         self.declare_parameter("info_topic",
                                "/camera/camera/depth/camera_info")
+        # Hazards count only inside the colour camera's narrower view: the outer
+        # band of the depth image gives false 10-13 mm bumps on plain floor
+        # (ground_probe.in_view). Until this arrives, or with an empty string,
+        # the whole depth image is used.
+        self.declare_parameter("colour_info_topic",
+                               "/camera/camera/color/camera_info")
         # 15 mm: about three times the 4.5 mm RMS noise floor measured on flat
         # tile at 0.85 m. Below this a reading cannot be told from sensor noise.
         self.declare_parameter("threshold_mm", 15.0)
@@ -141,6 +147,7 @@ class GroundHazardNode(Node):
                 self.mask_ok = mask > 0
 
         self.k = None           # (fx, fy, ppx, ppy), filled by the info callback
+        self.colour = None      # ((fx, fy, ppx, ppy), (width, height)) of the colour camera
         self.frame_count = 0
         self.processed = 0
         self.rng = np.random.default_rng(0)
@@ -155,6 +162,9 @@ class GroundHazardNode(Node):
                                  self.on_info, qos_profile_sensor_data)
         self.create_subscription(Image, g("depth_topic"),
                                  self.on_depth, qos_profile_sensor_data)
+        if g("colour_info_topic"):
+            self.create_subscription(CameraInfo, g("colour_info_topic"),
+                                     self.on_colour_info, qos_profile_sensor_data)
 
         self.create_timer(5.0, self.report)
         self.get_logger().info(
@@ -169,6 +179,13 @@ class GroundHazardNode(Node):
             self.get_logger().info(
                 f"intrinsics fx={self.k[0]:.1f} fy={self.k[1]:.1f} "
                 f"ppx={self.k[2]:.1f} ppy={self.k[3]:.1f}")
+
+    def on_colour_info(self, msg):
+        if self.colour is None:
+            self.colour = ((msg.k[0], msg.k[4], msg.k[2], msg.k[5]), (msg.width, msg.height))
+            self.get_logger().info(
+                f"hazards only inside the colour view ({msg.width}x{msg.height}, "
+                f"fx={msg.k[0]:.1f})")
 
     def on_depth(self, msg):
         self.frame_count += 1
@@ -249,6 +266,10 @@ class GroundHazardNode(Node):
                                    thresh, self.min_area_cm2, fx, fy,
                                    max_height=self.max_size_mm / 1000.0)
             hazards = [h for h in hazards if h["peak_mm"] <= self.max_size_mm]
+            # the depth and colour imagers are parallel and 15 mm apart, about
+            # 10 px at this range, inside in_view's 20 px margin
+            if self.colour is not None:
+                hazards = [h for h in hazards if in_view(h["centroid"], *self.colour)]
 
         self.publish_detections(hazards, nrm, inlier_frac, header)
         self.publish_markers(hazards, nrm, header)

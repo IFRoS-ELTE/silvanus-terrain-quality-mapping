@@ -48,6 +48,7 @@ K_ROUGH = float(os.environ.get("K_ROUGH", 3.0))   # threshold = max(15 mm, K_ROU
 WHEELS = [(0.249, 0.2915), (0.249, -0.2915), (-0.249, 0.2915), (-0.249, -0.2915)]   # scout_v2.xacro
 TYRE_HALF = 0.06          # half the tyre contact width, m
 MERGE_M = 0.30            # docs/schema.md: detections closer than this are one hazard
+DRIVE_V, DRIVE_W = 0.10, 0.30     # m/s forward and rad/s turn: a crossing is judged only while driving
 MIN_SEEN = 3              # a bump/hole seen in fewer frames is dropped as noise
 CELL = 0.05               # crack grid, m
 LARGE_MM, ROUGH_MM = 30, 5.0   # on ground rougher than 5 mm, bumps and holes under 30 mm are drawn faint: tufts, chips
@@ -91,8 +92,10 @@ def camera_transforms(bag):
     return get("camera_depth_optical_frame"), get("camera_color_optical_frame")
 
 
-def motion(bag, t_start):
-    """Path from wheel speed + IMU heading, IMU fast/slow ratio, and the vertical jolt signal."""
+def motion(bag, t_start, poses=None):
+    """Path from wheel speed + IMU heading, IMU fast/slow ratio, and the vertical jolt signal.
+    With poses (a run_slam.sh / pose_logger.py CSV with map_yaw) the position and heading come
+    from SLAM instead, in its map frame; the wheels still give speed and distance driven."""
     O, Y, F = [], [], []
     r = open_bag(bag, ["/odom", "/imu/data", "/filter/free_acceleration"])
     while r.has_next():
@@ -110,7 +113,13 @@ def motion(bag, t_start):
     yaw = np.interp(O[:, 0], Y[:, 0], np.unwrap(Y[:, 1]) - Y[0, 1])
     dt = np.diff(O[:, 0], prepend=O[0, 0])
     px, py = np.cumsum(O[:, 1] * dt * np.cos(yaw)), np.cumsum(O[:, 1] * dt * np.sin(yaw))
-    path = dict(t=O[:, 0], v=O[:, 1], x=px, y=py, yaw=yaw, s=np.cumsum(np.abs(O[:, 1]) * dt))
+    if poses is not None:
+        P = np.genfromtxt(poses, delimiter=",", names=True)
+        tp = P["t"] - t_start
+        px, py = np.interp(O[:, 0], tp, P["map_x"]), np.interp(O[:, 0], tp, P["map_y"])
+        yaw = np.interp(O[:, 0], tp, np.unwrap(P["map_yaw"]))
+    w = ndimage.uniform_filter1d(np.gradient(np.unwrap(yaw), O[:, 0] + 1e-9 * np.arange(len(O))), 15)  # turn rate, about 0.5 s
+    path = dict(t=O[:, 0], v=O[:, 1], w=w, x=px, y=py, yaw=yaw, s=np.cumsum(np.abs(O[:, 1]) * dt))
 
     N, FS = 180, 100.0
     fr = np.fft.rfftfreq(N, 1 / FS); W = np.hanning(N); R = []
@@ -124,6 +133,13 @@ def motion(bag, t_start):
     # jolt: vertical free acceleration minus its 0.5 s running median
     jolt = np.abs(F[:, 1] - ndimage.median_filter(F[:, 1], size=51, mode="nearest"))
     return path, np.array(R), np.stack([F[:, 0], jolt], 1)
+
+
+def driving(path, t):
+    """Driving forward, not turning on the spot: the only time a jolt says something about the ground.
+    A skid-steer robot turning on the spot scrubs its tyres and shakes by itself (2026-10-27: a 13 mm
+    "felt" bump from the 190 s the robot turned at a lane change)."""
+    return (np.interp(t, path["t"], path["v"]) >= DRIVE_V) & (np.abs(np.interp(t, path["t"], path["w"])) <= DRIVE_W)
 
 
 def pose_at(path, t):
@@ -153,13 +169,13 @@ def camera_pass(bag, t_start, path, T_bd, T_bc, seg):
     Kd = Kc = prev = col = None
     rng, n, last_crack = np.random.default_rng(0), 0, -9.0
     dets, unev, cracks, planes = [], [], {}, []
-    stats = dict(frames=0, skipped=0, crack_frames=0, crack_px=0, crack_kept=0)
+    stats = dict(frames=0, skipped=0, outside_colour=0, crack_frames=0, crack_px=0, crack_kept=0)
     while r.has_next():
         tp, data, st = r.read_next(); t = st * 1e-9 - t_start
         if tp == DINFO and Kd is None:
             m = deserialize_message(data, CameraInfo); Kd = (m.k[0], m.k[4], m.k[2], m.k[5])
         if tp == CINFO and Kc is None:
-            m = deserialize_message(data, CameraInfo); Kc = (m.k[0], m.k[4], m.k[2], m.k[5])
+            m = deserialize_message(data, CameraInfo); Kc = (m.k[0], m.k[4], m.k[2], m.k[5]); csize = (m.width, m.height)
         if tp == COLOR:
             col = data
         if tp != DEPTH or Kd is None:
@@ -194,6 +210,10 @@ def camera_pass(bag, t_start, path, T_bd, T_bc, seg):
         thresh = max(THRESH, K_ROUGH * u_mm / 1000.0)
         for h in gp.find_hazards(cloud, valid, resid, nrm, d, thresh, MIN_AREA, Kd[0], Kd[1], max_height=MAX_HEIGHT):
             if h["peak_mm"] > MAX_HEIGHT * 1000:
+                continue
+            # only where the colour camera sees it too: the depth image's outer band gives false bumps
+            if Kc is not None and not gp.in_view(T_cd[:3, :3] @ np.array(h["centroid"]) + T_cd[:3, 3], Kc, csize):
+                stats["outside_colour"] += 1
                 continue
             pb = (T_bd @ np.r_[h["centroid"], 1.0])[:3]
             wx, wy = to_world(path, t, pb)
@@ -312,12 +332,12 @@ def crack_segmenter():
     raise SystemExit("crack_unet16_v1.onnx not found: download it from the crack-model-v1 release (docs/crack_model.md)")
 
 
-def build(bag, use_cracks=True):
+def build(bag, use_cracks=True, poses=None):
     """Everything up to the classified hazards and the 0.25 m records, for this script and inspection_map.py."""
     bag = bag.rstrip("/"); name = os.path.basename(bag)
     t_start = open_bag(bag, []).get_metadata().starting_time.nanoseconds * 1e-9
     T_bd, T_bc = camera_transforms(bag)
-    path, R, J = motion(bag, t_start)
+    path, R, J = motion(bag, t_start, poses)
     seg = crack_segmenter() if use_cracks else None
     dets, U, cracks, stats, planes = camera_pass(bag, t_start, path, T_bd, T_bc, seg)
 
@@ -330,6 +350,8 @@ def build(bag, use_cracks=True):
         crossings = wheel_crossings(path, h)
         h["crossing_t"], h["imu_peak"], h["jolt_t"] = (crossings[0] if crossings else None), None, None
         for tc in crossings:
+            if not driving(path, tc):
+                continue
             peak, base, tj = jolt_at(J, tc)
             if felt(peak, base) and (h["imu_peak"] is None or peak > h["imu_peak"]):
                 h["imu_peak"], h["crossing_t"], h["jolt_t"] = peak, tc, tj
@@ -344,8 +366,7 @@ def build(bag, use_cracks=True):
             continue
         h["class"] = "C"; explained.append(h["jolt_t"])
     # B: jolts that stand out while no seen hazard is under a wheel
-    moving = np.interp(J[:, 0], path["t"], np.abs(path["v"])) > 0.05
-    cand = (J[:, 1] > 0.5) & moving & (J[:, 1] == ndimage.maximum_filter1d(J[:, 1], 41))
+    cand = (J[:, 1] > 0.5) & driving(path, J[:, 0]) & (J[:, 1] == ndimage.maximum_filter1d(J[:, 1], 41))
     for t in J[cand, 0]:
         if any(abs(t - e) < 0.8 for e in explained):
             continue

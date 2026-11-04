@@ -10,7 +10,7 @@ The short version: **the camera predicts, the IMU confirms.**
   <img src="docs/media/robot_left_side.jpg" width="70%" alt="Silvanus in the lab">
 </p>
 
-*Last updated 26 October 2026, week 4 of 8. Final presentation at the end of November.*
+*Last updated 4 November 2026, week 5 of 8. Final presentation at the end of November.*
 
 ---
 
@@ -24,12 +24,15 @@ The short version: **the camera predicts, the IMU confirms.**
 | 1 | Robot body and gripper mask | Done: depth mask, and the colour mask in the crack node |
 | 2 (8-14 Oct) | Outdoor localization tested | Done offline, wheel speed + IMU heading works best |
 | 2 | Crack model trained and released for the robot | Done, model v1 running in the crack node on our recordings |
-| 2 | Indoor map with SLAM | Blocked: the lidar scan contains the floor (section 5) |
+| 2 | Indoor map with SLAM, Nav2 to a goal on it | Done 27 Oct: the corridor loop closes to 1 cm, the robot drives to goals from RViz |
 | 2 | IMU roughness | The feature that separates surfaces is found; node not written yet |
 | 2 | RGB terrain classifier, annotation of our own frames | Started |
-| 3 (15-21 Oct) | Zigzag coverage sweep | Tool written; the simulator's skid steer turns too slowly to follow it yet |
-| 3 | Speed governor: slow down so the IMU can feel a hazard, stop before obstacles | Written and tested offline, not yet on the robot |
+| 3 (15-21 Oct) | Zigzag coverage sweep | First sweep on the robot 27 Oct, Nav2 through the governor; its stall at a lane change is fixed and checked in simulation |
+| 3 | Speed governor: slow down so the IMU can feel a hazard, stop before obstacles | Live on the robot 27 Oct: slows to 0.2 m/s, feels 10-74 mm plates, stops for walls and tall objects |
 | 3 | Camera and IMU fused, hazard classes A/B/C | Done offline on our recordings (section 6), live in the governor |
+| 4 (22-28 Oct) | Fully autonomous: live map, lanes planned by the robot, sweep | First robot try 28 Oct: everything starts from one script, but no lane was driven; the causes are fixed and checked in simulation |
+| 4 | Inspection page updating live on the laptop | Ran on the robot 28 Oct: the laptop showed the floor and a 17 mm wooden block |
+| 4 | Labelled outdoor runs with repeats | Open |
 
 Full plan to the end of November: [docs/MILESTONES.md](docs/MILESTONES.md).
 
@@ -176,13 +179,19 @@ cd tools/inspection_viewer && python3 -m http.server 8000      # then open http:
 
 Details: [tools/inspection_viewer](tools/inspection_viewer/README.md).
 
-On the robot the same idea runs live in the speed governor ([navigation/](navigation/README.md#speed-governor)): it slows to 0.20 m/s before every hazard on the wheel track so the IMU can feel it, stops for anything of 10 cm or more right in front or a lidar obstacle 40 cm from the bumper, and reports each hazard as felt (C) or not (A) once the rear wheels are past. On a replay of the tape-measured run (`navigation/replay_governor.sh`) it slows for the foam block and finds it felt (1.81 m/s²). It still has to be tested on the robot.
+On the robot the same idea runs live in the speed governor ([navigation/](navigation/README.md#speed-governor)): it slows to 0.20 m/s before every hazard on the wheel track so the IMU can feel it, stops for anything of 10 cm or more right in front or a lidar obstacle 40 cm from the bumper, and reports each hazard as felt (C) or not (A) once the rear wheels are past. On 27 October it did all of that live, with teleop and then under Nav2 in a first sweep of the corridor. That sweep is the newest run in the viewer, placed with the lidar map underneath and the route in orange where the robot slowed:
+
+<p align="center">
+  <img src="docs/media/inspection_sweep_1829.jpg" width="95%" alt="Inspection page of the corridor sweep with the lidar map">
+</p>
+
+The next step runs without a saved map and without a driver: live SLAM, one turn on the spot, lanes planned in the free floor the robot has mapped, the sweep through the governor, and the same page updating on the laptop while it drives ([docs/PROGRESS.md section 6](docs/PROGRESS.md#6-on-the-robot-map-nav2-the-governor-and-the-first-sweep-27-october)).
 
 ## 7. Known problems
 
 | Problem | Effect | Next step |
 |---|---|---|
-| The 2D scan contains the floor | SLAM and Nav2 unusable | Change `min_height` in the lab bring-up |
+| The 2D scan contains the floor | SLAM and Nav2 unusable | Done: our scripts start `/scan_fixed` without the floor; the lab bring-up still has the old scan |
 | Fixed depth threshold outdoors | Tufts and leaves boxed as 12-19 mm bumps | Done: the threshold follows the surface's unevenness (section 6) |
 | D435 drops off USB | Happened 5 times on 8 October, after fast or rough driving | Secure the cable; reported to the lab |
 | Wheel odometry heading | 15-30° error per run | Fuse the IMU heading (EKF, ready) |
@@ -191,8 +200,8 @@ On the robot the same idea runs live in the speed governor ([navigation/](naviga
 ## 8. Next weeks
 
 - **Week 3, done.** Crack U-Net in the robot's crack node with false-crack filters; camera and IMU fused into one map with the A/B/C classes; inspection map; speed governor, tested offline.
-- **Week 4, now.** At the robot: the scan fix checked in RViz, then the indoor map with SLAM; the speed governor live (wheels up first); crossing runs at 0.2, 0.3 and 0.4 m/s to make the felt test depend on speed; more labelled outdoor runs with repeats. Off the robot: crack model fine-tuned with our tile frames as "no crack"; RGB terrain classifier v1; IMU roughness node.
-- **Week 5.** Everything together, first on one bag and then live: the robot approaches a book, slows down by itself, crosses it, the IMU spike is logged and a confirmed marker appears on the map.
+- **Week 4, done.** At the robot: the scan fix, the indoor map with SLAM, Nav2 to goals, the speed governor live, a first sweep through it, a first try of the autonomous session with the live page.
+- **Week 5, now.** Everything together, first on one bag (done: the corridor sweep, section 6) and then live: the robot drives a lane by itself over a block, slows, crosses it, the IMU spike is logged and a confirmed marker appears on the live page. The parts all work on the robot; one autonomous run with all of them together is next. Still open from week 4: crossing runs at 0.2, 0.3 and 0.4 m/s, and labelled outdoor runs with repeats.
 - **Weeks 6-8.** Repeat runs, roughness vs speed, the camera unevenness vs IMU roughness comparison, hazard counts per class, the smallest hazard the robot feels, demo video and presentation.
 
 Every hazard will end up in one of three classes, which is the main result of the project:

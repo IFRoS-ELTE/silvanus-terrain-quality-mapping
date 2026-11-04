@@ -6,12 +6,17 @@
 #  2. records every topic for 12 s and stops if any is missing or the camera is dead
 #  3. records NAME_HHMM for SECONDS (default 90) inside the container, so a Wi-Fi
 #     drop does not stop it, then prints ros2 bag info
+# Recordings go to BAGS_DIR, which must be the folder the stack was started with. Both this
+# script and start_robot.sh default to the SSD when it is mounted at /mnt/ssd, else /data/bags.
 # With "lidar" as the third argument the cameras are left out (about 10 MB/s instead
-# of 60), for long SLAM loops.
+# of 60), for long SLAM loops. EXTRA_TOPICS="..." adds topics that may be quiet at the start
+# (the governor's /governor/felt): they are recorded but not part of the 12 s check.
 set -u
 NAME=${1:?usage: record_session.sh NAME [SECONDS]}
 DUR=${2:-90}
 MODE=${3:-all}
+# the host folder the stack mounts as /bags: the SSD when mounted, as start_robot.sh chooses
+BAGS_DIR=${BAGS_DIR:-$(mountpoint -q /mnt/ssd && echo /mnt/ssd/silvanus_bags || echo /data/bags)}
 ROS="source /opt/ros/jazzy/setup.bash && source /opt/robot/setup.bash"
 TOPICS="/camera/camera/color/image_raw /camera/camera/color/camera_info \
 /camera/camera/depth/image_rect_raw /camera/camera/depth/camera_info \
@@ -30,12 +35,13 @@ SCAN_FIXED="ros2 run pointcloud_to_laserscan pointcloud_to_laserscan_node --ros-
 
 sudo docker ps --format '{{.Names}}' | grep -qx silvanus || { echo "the stack is not running - run start_robot.sh first"; exit 1; }
 
-AVAIL=$(df --output=avail -BG /data/bags | tail -1 | tr -dc 0-9)
+AVAIL=$(df --output=avail -BG "$BAGS_DIR" | tail -1 | tr -dc 0-9)
 NEED=$(( DUR * RATE / 1000 + 2 ))
 if [ "$AVAIL" -lt "$NEED" ]; then echo "only ${AVAIL} GB free, need about ${NEED} GB - copy off and delete old bags"; exit 1; fi
-echo "${AVAIL} GB free"
+echo "${AVAIL} GB free in $BAGS_DIR"
 
-if ! sudo docker exec silvanus bash -c 'grep -qs "__node:=scan_fixed" /proc/[0-9]*/cmdline'; then
+# "scan_fixe[d]" so the check does not find its own command line, which also holds the name
+if ! sudo docker exec silvanus bash -c 'grep -qs "__node:=scan_fixe[d]" /proc/[0-9]*/cmdline'; then
     echo "starting /scan_fixed"
     sudo docker exec -d silvanus bash -c "$ROS && $SCAN_FIXED"
     sleep 5
@@ -61,10 +67,10 @@ if [ $BAD = 1 ]; then
 fi
 
 BAG=${NAME}_$(date +%H%M)
-sudo docker exec -d silvanus bash -c "$ROS && timeout -s INT $DUR ros2 bag record -s mcap -o /bags/$BAG $TOPICS > /bags/$BAG.log 2>&1"
+sudo docker exec -d silvanus bash -c "$ROS && timeout -s INT $DUR ros2 bag record -s mcap -o /bags/$BAG $TOPICS ${EXTRA_TOPICS:-} > /bags/$BAG.log 2>&1"
 echo ""
 echo ">>> RECORDING /bags/$BAG for $DUR s - start driving now (voice memo: say each surface)"
 sleep $(( DUR + 8 ))
 sudo docker exec silvanus bash -c "$ROS && ros2 bag info /bags/$BAG"
 echo ""
-echo "copy to the laptop:  scp -r agilex@192.168.1.102:/data/bags/$BAG ~/bags/"
+echo "copy to the laptop:  scp -r agilex@192.168.1.102:$BAGS_DIR/$BAG ~/bags/"

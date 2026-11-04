@@ -31,7 +31,8 @@ class Watch(Node):
 
     def on_felt(self, msg):
         d = json.loads(msg.data)
-        verdict = "FELT, class C" if d["felt"] else "not felt, class A"
+        verdict = f"part of {d['part_of']} (same jolt)" if d.get("part_of") else (
+            "FELT, class C" if d["felt"] else "not felt, class A")
         print(f"{self.stamp()}  {d['id']} {d['type']} {d['height_mm']} mm: jolt {d['imu_peak']} m/s^2 -> {verdict}", flush=True)
 
 

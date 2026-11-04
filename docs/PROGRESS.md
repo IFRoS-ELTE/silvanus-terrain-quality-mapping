@@ -1,6 +1,6 @@
 # Progress
 
-Terrain quality and hazard mapping with Silvanus. State on 2026-10-26, against
+Terrain quality and hazard mapping with Silvanus. State on 2026-11-04, against
 the plan in [MILESTONES.md](MILESTONES.md). Data: [DATA.md](DATA.md).
 
 ---
@@ -23,23 +23,45 @@ the plan in [MILESTONES.md](MILESTONES.md). Data: [DATA.md](DATA.md).
 | Task | State |
 |---|---|
 | Outdoor localization tested | ✅ done offline, results below |
-| Indoor map with SLAM Toolbox, AMCL on it | **blocked**: the lidar scan contains the floor (below) |
+| Indoor map with SLAM Toolbox, AMCL on it | ✅ 27 Oct, on `/scan_fixed`: the loop closes to 1 cm (section 6) |
 | IMU roughness node | the feature that works is found (below); node not written |
-| Nav2 configured for the Scout | open |
+| Nav2 configured for the Scout | ✅ [navigation/make_nav2_robot.py](../navigation/make_nav2_robot.py) turns the lab's simulator settings into the robot's |
 | RGB terrain classifier, first version | open; 5 labelled outdoor surfaces are ready |
 | Annotation from our own bags | open |
-| **Gate:** robot drives to a goal on a saved map | not yet, needs the scan fixed first |
+| **Gate:** robot drives to a goal on a saved map | ✅ 27 Oct, goals sent from RViz |
 | Week 3, started early: zigzag coverage sweep | tool written ([navigation/](../navigation/README.md)); in the lab simulator the skid-steer turns at less than half the commanded rate, so Nav2 cannot follow it yet |
 
 ### Week 3, 15-21 October
 
 | Task | State |
 |---|---|
-| Speed governor between the velocity command and the base | ✅ written and tested offline ([navigation/](../navigation/README.md#speed-governor)), not yet on the robot |
-| Fusion: camera and IMU into one record every 0.25 m | ✅ offline (section 5), live node open |
+| Speed governor between the velocity command and the base | ✅ live on the robot 27 Oct: slows, feels, stops (section 6) |
+| Fusion: camera and IMU into one record every 0.25 m | ✅ offline (section 5); a live inspection page (section 6) |
 | Hazard classes A, B and C assigned and stored | ✅ offline (section 5) and live in the governor (`/governor/felt`) |
-| Boustrophedon sweep indoors | blocked by the scan, as above |
+| Boustrophedon sweep indoors | ✅ first sweep with Nav2 through the governor on 27 Oct; its lane-change stall is fixed and checked in simulation (section 6) |
 | Vibration-based terrain classifier | open |
+
+### Week 4, 22-28 October
+
+| Task | State |
+|---|---|
+| Outdoor localization decided | wheel speed + IMU heading offline (section 4); live SLAM works indoors, not tried outdoors yet |
+| Labelled outdoor runs with repeats | open |
+| EKF of wheels, IMU and GPS | config ready, tested offline, not live |
+| Terrain classifier on outdoor images | open |
+| Map layer: path, hazard markers | ✅ inspection page with the lidar map, the route and where the robot slowed (section 6) |
+| Started early, week 5: live view, the same pipeline live | the live page and the fully autonomous sweep (live SLAM, lanes planned by the robot) are written and checked in simulation and on a replay; first try on the robot 28 Oct (section 6) |
+| **Gate:** labelled outdoor dataset | not yet |
+
+### Week 5, 29 October - 4 November
+
+| Task | State |
+|---|---|
+| Full pipeline on one bag, on one laptop | ✅ `corridor_sweep_1829`: SLAM positions, the lidar map, the stitched floor, hazards and the governor's slow-downs on one page (section 6) |
+| The same, live on the robot | partly: on 28 Oct the stack, hazard node, governor, live SLAM, Nav2 and the live page all ran from `auto_session.sh`; no lane driven yet, the causes fixed and checked in simulation |
+| Book demo: approach, slow, cross, IMU spike, marker in class C | every part works live (27 Oct, teleop: slowed 0.3 → 0.2 m/s before plates, felt 10-74 mm); not yet in one autonomous run |
+| Live view: map, path, hazards, camera | ✅ on the robot 28 Oct, opened in the laptop's browser |
+| **Gate:** the headline demo end to end | not yet |
 
 ---
 
@@ -248,11 +270,149 @@ Limits of this first version:
 
 ---
 
+## 6. On the robot: map, Nav2, the governor and the first sweep (27 October)
+
+**Indoor map.** With `/scan_fixed` (the lidar scan without the floor) SLAM Toolbox works. Three
+loops of the corridor, about 22 m each. On the third the robot ended on its start tape: the first
+and last lidar scans match to 4 cm without SLAM, and SLAM's end is 1 cm from that. Wheels alone
+are 1.82 m off. Map: 16 x 26 m, `indoor_loop3_1316`.
+
+**Nav2 on the saved map.** The lab's Nav2 settings are written for the simulator (sim time,
+stamped velocity, the floor-seeing `/scan`, no localisation). `navigation/make_nav2_robot.py`
+makes the robot's version from them: real time, plain Twist, `/scan_fixed` in its own frame, lidar
+beams with no return clearing the costmap (otherwise a person who walked past stays an obstacle),
+AMCL on the saved map. The robot drove to goals sent from RViz.
+
+**The speed governor live**, driven with teleop at up to 0.3 m/s:
+
+| test | result |
+|---|---|
+| lidar stop, wall ahead | stopped 0.37-0.40 m before it with the key held |
+| depth stop, 123 mm and 216 mm objects | stopped 0.34-0.35 m before the front wheels |
+| slow down, 10-23 mm plates | 0.30 -> 0.20 m/s before each |
+| feel | felt: 10 mm (jolt 0.87 m/s²), 19 mm (1.48), 18 mm (2.65), 21 mm (1.68), 74 mm (1.28) |
+
+One plate was often tracked as two or three pieces that shared one jolt, so all but one came out
+"not felt". Pieces within 0.6 m that share a jolt are now one object (`part_of`).
+
+**The camera pose.** The arm had been folded differently, so the camera saw the robot's front
+wheels and bumper as 230-275 mm "bumps" and the governor would not let it drive.
+`tools/robot/arm_to_pose.py` puts it back in Pose B through MoveIt. MoveIt first refused: in its
+model the folded gripper overlapped the arm base by 18 mm. The script finds the smallest move that
+gets clear with the overlap shrinking at every step (wrist -15°), then plans the rest with
+collision checking. Result: all joints within 0.3° of Pose B.
+
+**The first sweep** (`corridor_sweep_1829`): Nav2 on the saved map through the governor, two
+lanes of 3 m, everything recorded. It finished, but stood 190 s at one lane change, turning back and
+forth 0.23-0.5 m from the corner it had to reach. The causes, each checked in a simulation of the
+robot on the real map ([tools/sim/fake_robot.py](../tools/sim/fake_robot.py): the wheels' 5 % turn
+error, the lidar ray-cast from the map):
+
+| cause | fix |
+|---|---|
+| every corner faced along the lane, so the next lane start sat beside the robot, which only drives forwards | every corner faces the next leg: turn on the spot, drive straight, turn |
+| goal tolerance 0.20 m, under AMCL's 0.3-0.45 m spread in the corridor | 0.35 m and 30° for sweeps |
+| the lab's MPPI controller circles a goal it cannot line up with | Regulated Pure Pursuit inside the Rotation Shim |
+| the governor's lidar stop counted walls diagonally beside the robot | only returns in the robot's own lane count |
+| slowing cut only the speed, so every curve got tighter and the robot looped | speed and turn are scaled together |
+
+Simulated, the full 5 m x 3 lane sweep then takes 78 s with no "failed to make progress".
+
+**The inspection page for the sweep**, placed with offline SLAM instead of wheels + IMU: the lidar
+map under the stitched floor, and the route in orange where the governor slowed the robot. The first
+version was poor: swirls of frames from the 190 s the robot turned at the lane change, every grout line
+laid two or three times, and 15 "cracks" that were all pieces of grout. Laid flat, one frame's tiles are
+square to 0.5°, but between frames SLAM's heading varied by 1-2.5° (and up to 10° while the robot
+hovered) and its position by up to 10 cm. Now:
+
+- frames only while driving: at least 5 cm/s, no turning on the spot or curves tighter than 1 m, in
+  stretches of at least 0.5 m
+- on a floor with a grid (tiles, paving: lines in two directions at right angles in at least half of the
+  frames) the lines give each frame its heading (the median direction over all frames) and its position
+  (each grout line on the same line laid before, nearest within 14 cm, under half a 30 cm tile);
+  elsewhere frames are matched on edges, ±2.5° and ±6 cm, with the correction kept under 15 cm so the
+  page stays on the map positions
+- on a grid floor cracks must be seen in 3 frames and 40 % of the views, and nothing along the grid's
+  lines counts: all 15 grout "cracks" are gone, 0 m of cracks on this floor. Outdoors nothing changes:
+  `garden_surfaces_1628` keeps 11.5 m of asphalt cracks (12.9 m before) and its 12 high-priority items
+- a bump within 10 cm of a wall in the lidar map is the foot of the wall
+- a crossing is judged felt only while driving forward (at least 0.1 m/s, turning under 0.3 rad/s): a
+  skid-steer robot turning on the spot shakes by itself. The tape-measured run 1447 is unchanged (block
+  1.88 and wooden block 0.81 felt, foam strips not)
+
+- a depth hazard counts only where the colour camera sees it too (`ground_probe.in_view`, in the live
+  node and offline). The page still had three 10-13 mm "bumps" with no photo, and they were what the
+  governor slowed the robot for, six times, on that run. All three sat in the outer band of the depth
+  image (90° wide against 56° for colour), two in its top right corner and one at its left edge, where a
+  flat floor reads 5-12 mm high; the colour camera saw plain tile. One was "felt" only because a wheel
+  crossed that spot during a 0.77 jolt, just over the 0.75 limit. The colour view still reaches 0.42 m
+  to each side, past the outer edge of the tyres at 0.35 m. Replayed through the live node the sweep now
+  gives no slow-downs, and the tape-measured run keeps its five objects, felt as before (the foam block
+  slows the robot and is felt at 1.81 m/s²); what it loses there are things 0.6-0.7 m beside the path,
+  mostly the table legs. Outdoors about half the items on the 1548 and 1628 pages were seen only in that band.
+
+The page of this run now lists nothing: 0 m of cracks, no bumps or holes. The orange stretch is where the
+governor slowed the robot during the run, for those three false bumps.
+
+![inspection page of the sweep](media/inspection_sweep_1829.jpg)
+
+**The autonomous version.** No saved map and nobody driving
+([tools/robot/auto_session.sh](../tools/robot/auto_session.sh)): live SLAM, Nav2 and the governor;
+the robot turns once on the spot, fits lanes 0.8 m apart into the free floor it has mapped (at least
+0.6 m from walls and unknown space, up to the area it is given, [navigation/lane_planner.py](../navigation/lane_planner.py))
+and sweeps them. The arm counts: in Pose B the camera housing is 1.05 m ahead of the robot centre, so
+turning on the spot sweeps a circle of about 1 m. Lane ends and corners need 1.25 m free all round, the
+first turn on the spot is refused when the lidar sees anything that close, Nav2's outline includes the
+arm (`make_nav2_robot.py --arm-footprint`), and the governor's lidar stop is measured from the camera,
+0.15 m before it. Measured from the bumper, the live test's stop at 0.40 m left the camera 7 cm past the
+stop line: against a wall it would have touched. The lab's SLAM settings ignored scans while the robot turned on the spot
+(`check_min_dist_and_heading_precisely: false`): the map stayed at 13 m² through a full turn and
+grew to 70 m² once that was set. In simulation with a 5 x 5 m request it planned two lanes (1.6 and
+3.9 m) with room for the arm to turn and swept them in 36 s. In this 3.3-4.3 m corridor that is about 9 m²
+of floor instead of 21 m² without the arm; the start tape itself is only 1.05 m from a wall, so the robot
+has to start 0.7 m to its left.
+
+![autonomous sweep in simulation](media/auto_sweep_sim.png)
+
+**The live page.** [tools/analysis/inspection_live.py](../tools/analysis/inspection_live.py) runs on
+the robot and every 2 s writes the run in the viewer's format: the floor from about two colour
+frames a second (laid on the map's floor plane with the camera pose from TF), the live lidar map,
+the route with slow and stop stretches, and the governor's hazards with their felt verdicts.
+`tools/robot/live_web.sh` serves it, and the laptop opens `http://192.168.1.102:8000`. Only these
+files cross the Wi-Fi. Checked by replaying `corridor_sweep_1829` as if it were live.
+
+**First autonomous sessions on the robot (28 October).** The stack, the hazard node, the governor,
+SLAM and Nav2 all came up from `auto_session.sh`, and the live page showed the floor and a 17 mm
+wooden block (32 x 7 cm, the right size). No lane was driven yet. What stopped it, each fixed and
+checked in simulation since:
+
+| on the robot | cause | fix |
+|---|---|---|
+| "no free floor for a lane" on open floor | SLAM Toolbox's `min_pass_through: 2`: from one spot the floor beyond about 1.5 m stays unknown, which the planner reads as a wall | `min_pass_through: 1`, and the planner adds the floor the latest scan sees (`lane_planner.add_scan`): 14 → 53 m² free from one spot in simulation |
+| the turn on the spot at the start stopped after a quarter turn | Nav2 cuts a turn short when anything is inside the arm's 1 m circle, here the person at the e-stop | no turn at all: the lidar sees all round (`--spin` keeps it as an option) |
+| the robot turned and reversed by itself after the governor stopped it | Nav2's own recovery: 90° turn and 0.3 m back, blind, with the arm out | `make_nav2_robot.py --wait-recovery`: clear the costmaps and wait only |
+| the block twice, tiles at odd angles on the live page | frames taken while turning, laid with a lagging heading | the live page lays only frames taken while driving, as the offline page does |
+| the block missing from the live page | a 17 mm bump not crossed yet is low priority, and low items were hidden | the live page shows them |
+| the live page did not start | `docker cp` cannot set a file's owner on the exFAT SSD | written through `cat` |
+| the planner did not start | no scipy in the robot's container | OpenCV instead |
+
+The live page node also crashed when its canvas grew by a rounding error of one pixel (found replaying
+`corridor_sweep_1829`); fixed.
+
+**Recording.** On the internal disk the recorder dropped up to 60 % of all messages while driving
+(gaps up to 3.5 s on every topic at once). Recorded to the SSD, the sweep kept the camera at 25
+frames a second. `start_robot.sh` now mounts the SSD by itself and recordings go there.
+
+---
+
 ## Problems found
 
 | problem | effect | next step |
 |---|---|---|
-| `/scan` contains the floor | SLAM and Nav2 unusable | change `min_height` in the lab bring-up |
+| `/scan` contains the floor | SLAM and Nav2 unusable | done: `/scan_fixed` (min height +0.10 m), started by our scripts; the lab bring-up still has the old one |
+| The D435 reconnects as a new USB device | the container cannot see it until the stack restarts | replug, then `start_robot.sh` (a reboot was needed once) |
+| Recorder stalls on the internal disk (95 % full) | up to 60 % of messages lost while driving | record to the SSD |
+| Arm not in Pose B | the camera sees the robot itself | `tools/robot/arm_to_pose.py` before every session |
 | Depth threshold outdoors | tufts and leaves on grass and wood chips boxed as 12-19 mm bumps | done: threshold follows the unevenness (section 5), also in the node (`rough_factor`) |
 | Crack model on tile | every grout line is a crack | straight-line and step-edge filters, in the map and in the crack node; about 60 % of tile frames keep a short piece; the real fix is tile frames as negatives in the fine-tune |
 | Felt test | calibrated at 0.2 m/s on one run | more crossing runs at 0.2, 0.3 and 0.4 m/s, with the governor live |
@@ -262,10 +422,12 @@ Limits of this first version:
 
 ## Next
 
-1. Fix the scan, repeat SLAM indoors and outdoors, build and save the indoor map.
-2. EKF live on the robot (config ready, tested offline), then Nav2 to a goal on the saved map.
-3. IMU roughness node with the frequency-band feature.
-4. Crack model fine-tuned on our frames with tile as negatives; terrain classifier on the outdoor bags.
-5. The speed governor live on the robot (wheels up first), then the hazard map as a live node.
+1. On the robot: the autonomous session indoors with the 28 October fixes, one straight lane over
+   plates first (`LENGTH=3 WIDTH=0`), then the corridor, then the whole-room mode (`ROOM=1`) in a
+   room without tables; then the same outdoors (live SLAM outside is still untested).
+2. Crossing runs at 0.2, 0.3 and 0.4 m/s, so the felt test can depend on speed.
+3. Labelled outdoor runs with repeats (the week 4 gate).
+4. IMU roughness node with the frequency-band feature; EKF live.
+5. Crack model fine-tuned on our frames with tile as negatives; terrain classifier on the outdoor bags.
 
 Scripts for every figure: [tools/analysis](../tools/analysis/README.md).

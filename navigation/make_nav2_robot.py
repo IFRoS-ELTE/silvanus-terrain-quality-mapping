@@ -1,0 +1,157 @@
+"""Make the Nav2 parameters for the real robot from the lab's simulator parameters.
+
+The lab's scout_xarm_navigation/config/nav2_params.yaml is written for Gazebo:
+sim time, TwistStamped on /cmd_vel, the lidar's own /scan (which sees the floor, see
+docs/PROGRESS.md) and no localisation on a saved map. This writes a copy with
+- use_sim_time false and plain Twist on /cmd_vel (what the Scout base takes)
+- /scan_fixed in both costmaps and the collision monitor, in its own frame (base_footprint);
+  its beams with no return (inf) count as free space, otherwise obstacles that moved away stay
+- forward speed capped at --max-speed for the first runs
+- an amcl section on /scan_fixed, optionally starting at a known pose on the map
+
+    python3 make_nav2_robot.py LAB_PARAMS OUT [--max-speed 0.2] [--initial-pose X Y YAW_DEG]
+"""
+
+import argparse
+import math
+import re
+
+ap = argparse.ArgumentParser()
+ap.add_argument("lab_params")
+ap.add_argument("out")
+ap.add_argument("--max-speed", type=float, default=0.2)
+ap.add_argument("--initial-pose", type=float, nargs=3, metavar=("X", "Y", "YAW_DEG"))
+ap.add_argument("--goal-tolerance", type=float, nargs=2, metavar=("XY_M", "YAW_DEG"),
+                help="looser goal check for coverage: the lab's 0.20 m is tighter than AMCL's spread in a long corridor")
+ap.add_argument("--cmd-vel-out", default="cmd_vel",
+                help="where the collision monitor sends Nav2's last command; cmd_vel_in puts the speed governor "
+                     "(navigation/speed_governor.py) between Nav2 and the base")
+ap.add_argument("--arm-footprint", action="store_true",
+                help="add the arm in Pose B to the robot outline: the camera reaches 1.05 m ahead of the centre at "
+                     "0.8 m height, so turning on the spot sweeps a 1 m circle. Costmaps, controller and collision "
+                     "monitor then check it like the body (lidar band 0.1-0.6 m: walls and people, not table tops)")
+ap.add_argument("--controller", choices=["mppi", "rpp"], default="mppi",
+                help="rpp: Regulated Pure Pursuit inside the Rotation Shim, which turns on the spot to face the path "
+                     "and to the goal heading. For lane sweeps: the lab's forward-only MPPI circles a goal it cannot "
+                     "line up with (robot 2026-10-27, and in tools/sim/fake_robot.py)")
+ap.add_argument("--wait-recovery", metavar="BT_XML_ON_ROBOT", nargs="?", const="/tmp/nav_robot/nav_to_pose_wait.xml",
+                help="when stuck, only clear the costmaps and wait, never turn on the spot or back up: Nav2's own "
+                     "recovery turns 90 deg and reverses 0.3 m blind, with the arm out (robot 2026-10-28, after the "
+                     "governor stopped it). Writes nav_to_pose_wait.xml next to OUT; the value is where the session "
+                     "scripts put it in the container")
+a = ap.parse_args()
+
+text = open(a.lab_params).read()
+
+
+def sub(pattern, new, count):
+    global text
+    text, n = re.subn(pattern, new, text, flags=re.M)
+    assert n == count, f"{pattern!r}: expected {count} matches, found {n}"
+
+
+sub(r"use_sim_time: true", "use_sim_time: false", 14)
+sub(r"enable_stamped_cmd_vel: true", "enable_stamped_cmd_vel: false", 5)
+sub(r"(topic: )\"?/scan\"?", r'\1"/scan_fixed"', 3)
+sub(r"sensor_frame: rslidar", 'sensor_frame: ""', 2)
+sub(r"min_obstacle_height: 0\.0", "min_obstacle_height: -0.1", 2)    # scan points sit at z = 0
+sub(r"inf_is_valid: False", "inf_is_valid: True", 2)    # /scan_fixed beams with no return clear the costmap
+sub(r"^(\s+)vx_max: 0\.45", rf"\g<1>vx_max: {a.max_speed:.2f}", 1)
+sub(r"^(\s+)max_velocity: \[0\.45,", rf"\g<1>max_velocity: [{a.max_speed:.2f},", 1)
+sub(r'cmd_vel_out_topic: "cmd_vel"', f'cmd_vel_out_topic: "{a.cmd_vel_out}"', 1)
+if a.arm_footprint:
+    sub(r'footprint: "\[\[-0\.325, -0\.325\], \[-0\.325, 0\.325\], \[0\.325, 0\.325\], \[0\.46, 0\.0\], \[0\.325, -0\.325\]\]"',
+        'footprint: "[[-0.325, -0.325], [-0.325, 0.325], [0.325, 0.325], [0.46, 0.14], [1.05, 0.14], '
+        '[1.05, -0.14], [0.46, -0.14], [0.325, -0.325]]"', 2)
+if a.wait_recovery:
+    import os
+    bt = open("/opt/ros/jazzy/share/nav2_bt_navigator/behavior_trees/navigate_to_pose_w_replanning_and_recovery.xml").read()
+    bt, n = re.subn(r"^\s*<(Spin|BackUp) [^>]*/>\n", "", bt, flags=re.M)
+    assert n == 2, f"expected the Spin and BackUp recoveries, removed {n}"
+    open(os.path.join(os.path.dirname(os.path.abspath(a.out)), "nav_to_pose_wait.xml"), "w").write(
+        "<!-- navigate_to_pose_w_replanning_and_recovery.xml without the Spin and BackUp recoveries "
+        "(navigation/make_nav2_robot.py --wait-recovery) -->\n" + bt)
+    sub(r"^bt_navigator:\n  ros__parameters:\n", f"bt_navigator:\n  ros__parameters:\n"
+        f"    default_nav_to_pose_bt_xml: {a.wait_recovery}\n", 1)
+if a.goal_tolerance:
+    sub(r"xy_goal_tolerance: 0\.20", f"xy_goal_tolerance: {a.goal_tolerance[0]:.2f}", 1)
+    sub(r"yaw_goal_tolerance: 0\.25", f"yaw_goal_tolerance: {math.radians(a.goal_tolerance[1]):.2f}", 1)
+
+pose = ""
+if a.initial_pose:
+    x, y, yaw = a.initial_pose
+    pose = (f"    set_initial_pose: true\n"
+            f"    initial_pose: {{x: {x:.3f}, y: {y:.3f}, z: 0.0, yaw: {math.radians(yaw):.4f}}}\n")
+
+amcl = f"""amcl:
+  ros__parameters:
+    use_sim_time: false
+    base_frame_id: "base_footprint"
+    odom_frame_id: "odom"
+    global_frame_id: "map"
+    scan_topic: /scan_fixed
+    robot_model_type: "nav2_amcl::DifferentialMotionModel"
+    laser_model_type: "likelihood_field"
+    laser_max_range: 20.0
+    laser_min_range: -1.0
+    laser_likelihood_max_dist: 2.0
+    max_beams: 60
+    min_particles: 500
+    max_particles: 2000
+    alpha1: 0.2
+    alpha2: 0.2
+    alpha3: 0.2
+    alpha4: 0.2
+    alpha5: 0.2
+    sigma_hit: 0.2
+    z_hit: 0.5
+    z_rand: 0.5
+    z_max: 0.05
+    z_short: 0.05
+    lambda_short: 0.1
+    pf_err: 0.05
+    pf_z: 0.99
+    resample_interval: 1
+    recovery_alpha_fast: 0.0
+    recovery_alpha_slow: 0.0
+    update_min_a: 0.2
+    update_min_d: 0.25
+    transform_tolerance: 1.0
+    tf_broadcast: true
+    save_pose_rate: 0.5
+{pose}
+"""
+
+head = (f"# Generated by navigation/make_nav2_robot.py from the lab's nav2_params.yaml:\n"
+        f"# real time, plain Twist, /scan_fixed, forward speed <= {a.max_speed:.2f} m/s, amcl added,\n"
+        f"# Nav2's last command out on /{a.cmd_vel_out}, {a.controller} controller"
+        f"{', outline with the arm in Pose B' if a.arm_footprint else ''}.\n\n")
+body = amcl + text
+if a.controller == "rpp":
+    import yaml                        # structured edit: the MPPI block is replaced whole (its comments go)
+    doc = yaml.safe_load(body)
+    doc["controller_server"]["ros__parameters"]["FollowPath"] = {
+        "plugin": "nav2_rotation_shim_controller::RotationShimController",
+        "primary_controller": "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController",
+        "angular_dist_threshold": 0.6,           # turn on the spot first when the path is more than ~35 deg off
+        "forward_sampling_distance": 0.5,
+        "rotate_to_heading_angular_vel": 0.5,
+        "max_angular_accel": 1.0,
+        "simulate_ahead_time": 1.0,
+        "rotate_to_goal_heading": True,
+        "desired_linear_vel": a.max_speed,
+        "lookahead_dist": 0.6, "min_lookahead_dist": 0.3, "max_lookahead_dist": 0.9,
+        "use_velocity_scaled_lookahead_dist": False,
+        "transform_tolerance": 0.5,
+        "min_approach_linear_velocity": 0.05, "approach_velocity_scaling_dist": 0.6,
+        "use_collision_detection": True, "max_allowed_time_to_collision_up_to_carrot": 1.5,
+        "use_regulated_linear_velocity_scaling": True, "regulated_linear_scaling_min_radius": 0.9,
+        "regulated_linear_scaling_min_speed": 0.1,
+        "use_cost_regulated_linear_velocity_scaling": False,   # the corridor is inflated wall to wall
+        "use_rotate_to_heading": True, "rotate_to_heading_min_angle": 0.6,
+        "max_angular_vel": 0.5,
+        "allow_reversing": False,
+    }
+    body = yaml.safe_dump(doc, sort_keys=False)
+open(a.out, "w").write(head + body)
+print(f"wrote {a.out}")

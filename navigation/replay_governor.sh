@@ -22,6 +22,6 @@ python3 navigation/governor_watch.py --ros-args -p use_sim_time:=true 2>/dev/nul
 sleep 4
 echo "replaying $(basename "$BAG"), operator asks for $SPEED m/s ..."
 ros2 bag play "$BAG" --clock --topics /camera/camera/depth/image_rect_raw /camera/camera/depth/camera_info \
-    /tf /tf_static /odom /filter/free_acceleration /scan > /dev/null 2>&1
+    /camera/camera/color/camera_info /tf /tf_static /odom /filter/free_acceleration /scan > /dev/null 2>&1
 sleep 4
 echo "done. Governor log: /tmp/replay_governor.log"

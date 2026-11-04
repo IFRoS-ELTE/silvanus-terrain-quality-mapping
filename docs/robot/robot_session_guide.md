@@ -25,24 +25,39 @@ Passwords show nothing as you type. That is normal.
 
 ---
 
-## Quick way (two scripts)
+## Quick way (scripts)
 
-Copy them to the robot once:
+Copy them to the robot once (from the repository on the laptop):
 
 ```bash
-scp ~/workspaces/silvanus-terrain-quality-mapping/tools/robot/*.sh agilex@192.168.1.102:~/
+cd ~/workspaces/silvanus-terrain-quality-mapping
+mkdir -p ~/governor && cp ground_demo/ground_hazard_node.py ground_demo/ground_probe.py \
+    ground_demo/robot_mask_d435_gripper.png navigation/speed_governor.py ~/governor/
+scp -r tools/robot/*.sh tools/robot/arm_to_pose.py navigation/auto_sweep.py navigation/lane_planner.py \
+    navigation/coverage_sweep.py tools/analysis/inspection_live.py tools/inspection_viewer \
+    ~/governor ~/nav_robot agilex@192.168.1.102:~/
 ```
 
-Then on the robot:
+`~/nav_robot` holds the Nav2 settings from `navigation/make_nav2_robot.py` and the saved map
+(see [navigation/README.md](../../navigation/README.md)). Then on the robot:
 
 ```bash
-./start_robot.sh            # CAN, finds the Xsens port, checks the camera, starts the stack with the IMU settings
+./start_robot.sh            # CAN, Xsens port, camera check, mounts the SSD if plugged in, starts the stack
+sudo docker exec -it silvanus bash -c "source /opt/ros/jazzy/setup.bash && source /opt/robot/setup.bash && python3 /tmp/arm_to_pose.py"
+                            # (after: sudo docker cp ~/arm_to_pose.py silvanus:/tmp/) camera arm to Pose B
 ./record_session.sh garden_surfaces 90   # corrected scan, 12 s check of every topic, then 90 s recording
+bash governor_up.sh 0.5     # depth hazard node + speed governor + /scan_fixed; teleop on /cmd_vel_in
+LENGTH=5 WIDTH=5 bash auto_session.sh hall dry   # live map, turn, plan the lanes, print them
+                            # start with 1.25 m free all round: the arm's camera reaches 1.05 m ahead
+LENGTH=5 WIDTH=5 bash auto_session.sh hall       # ... and sweep them, recorded, live page on :8000
+ROOM=1 bash auto_session.sh lab                  # the whole room, then again over what it had not seen
 ```
 
-`record_session.sh` also records `/rslidar_points` (the 3D lidar) and `/scan_fixed`
-(the scan with the floor cut out, see `docs/PROGRESS.md`). The sections below are
-the same steps by hand.
+Recordings go to the SSD when it is plugged in (`/mnt/ssd/silvanus_bags`), otherwise to
+`/data/bags`. `record_session.sh` also records `/rslidar_points` (the 3D lidar) and `/scan_fixed`
+(the scan with the floor cut out, see `docs/PROGRESS.md`). During `auto_session.sh` the inspection
+page updates live at `http://192.168.1.102:8000` (`live_web.sh`). The sections below are the same
+steps by hand.
 
 ---
 
