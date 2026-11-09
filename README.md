@@ -10,7 +10,7 @@ The short version: **the camera predicts, the IMU confirms.**
   <img src="docs/media/robot_left_side.jpg" width="70%" alt="Silvanus in the lab">
 </p>
 
-*Last updated 4 November 2026, week 5 of 8. Final presentation at the end of November.*
+*Last updated 9 November 2026, week 6 of 8. Final presentation at the end of November.*
 
 ---
 
@@ -131,6 +131,12 @@ Depth and the IMU say how rough the ground is. The colour camera adds what the s
   <img src="docs/media/terrain_timeline_1628.png" width="95%" alt="Labelled and predicted surface over the whole outdoor run 1628, with the model's confidence">
 </p>
 
+Which surface it confused with which, on the held-out runs 1628 (outdoor) and 1447 (indoor tile). The two wood-chip frames called grass/dirt are at the end of the wood-chip stretch, where the chips thin out into dirt:
+
+<p align="center">
+  <img src="docs/media/terrain_confusion_1628_1447.png" width="55%" alt="Confusion matrix of the terrain classifier on the held-out runs 1628 and 1447">
+</p>
+
 The surfaces are visually distinct and all outdoor runs were recorded on one afternoon, so this shows the classifier works on our recordings, not yet on other days or surfaces. On a run with ground it has no class for, it calls smooth concrete "asphalt" with high confidence. A metal drain grate gets low confidence, so the node publishes `unknown` there. Details, both folds and the confusion matrix: [docs/terrain_classifier.md](docs/terrain_classifier.md).
 
 ## 4. Cracks
@@ -223,6 +229,7 @@ The next step runs without a saved map and without a driver: live SLAM, one turn
 - **Week 3, done.** Crack U-Net in the robot's crack node with false-crack filters; camera and IMU fused into one map with the A/B/C classes; inspection map; speed governor, tested offline.
 - **Week 4, done.** At the robot: the scan fix, the indoor map with SLAM, Nav2 to goals, the speed governor live, a first sweep through it, a first try of the autonomous session with the live page.
 - **Week 5, now.** Everything together, first on one bag (done: the corridor sweep, section 6) and then live: the robot drives a lane by itself over a block, slows, crosses it, the IMU spike is logged and a confirmed marker appears on the live page. The parts all work on the robot; one autonomous run with all of them together is next. Still open from week 4: crossing runs at 0.2, 0.3 and 0.4 m/s, and labelled outdoor runs with repeats.
+- **Week 6, now.** RGB terrain classifier done (99.5 % on held-out runs, section 3) and its ROS node written; crack model v2 from our own annotated frames, with tile grout as "no crack" examples, tested against v1 on the two test runs.
 - **Weeks 6-8.** Repeat runs, roughness vs speed, the camera unevenness vs IMU roughness comparison, hazard counts per class, the smallest hazard the robot feels, demo video and presentation.
 
 Every hazard will end up in one of three classes, which is the main result of the project:
@@ -243,6 +250,7 @@ Every hazard will end up in one of three classes, which is the main result of th
 | [docs/DATA.md](docs/DATA.md) | Every recorded bag, surface labels, how to replay them (bags are on the shared drive) |
 | [docs/schema.md](docs/schema.md) | Topic names and message formats |
 | [docs/crack_model.md](docs/crack_model.md) | Crack model: files, how to use it in the node, annotation and fine-tuning |
+| [docs/terrain_classifier.md](docs/terrain_classifier.md) | RGB terrain classifier: labels, training by held-out run, results, the ROS node |
 | [docs/vision_log.md](docs/vision_log.md) | Vision decisions and results, step by step |
 | [docs/robot/](docs/robot/) | Arm pose, IMU mount, how to run a robot session |
 | [tools/analysis/](tools/analysis/README.md) | Scripts that make every figure on this page |
