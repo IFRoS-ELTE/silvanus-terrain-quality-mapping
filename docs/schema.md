@@ -52,7 +52,8 @@ Published by the lab stack. We only read them. Names exactly as in our bags.
 | `/crack_detection/markers` | `visualization_msgs/MarkerArray` | crack node | RViz | exists |
 | `/crack_detection/camera_info` | `sensor_msgs/CameraInfo` | crack node | viewing | exists |
 | `/ground/rgb_terrain` | `std_msgs/String` (JSON) | RGB terrain classifier (`src/rgb_terrain`) | fusion | exists, model training |
-| `/terrain/imu_roughness` | `std_msgs/Float32` | IMU roughness node | fusion, governor | planned |
+| `/terrain/imu_roughness` | `std_msgs/Float32` | IMU roughness node (`src/terrain_imu`) | fusion, governor | exists |
+| `/terrain/imu_roughness_debug` | `std_msgs/String` (JSON) | IMU roughness node | plotting, checking | exists |
 | `/terrain/imu_terrain` | `std_msgs/String` (JSON) | IMU terrain classifier | fusion | planned |
 | `/terrain/speed_limit` | `std_msgs/Float32` | fusion | governor | planned |
 | `/cmd_vel_in` | `geometry_msgs/Twist` | teleop, Nav2 | governor | exists |
@@ -130,6 +131,14 @@ already removed) at 8-50 Hz divided by the power at 0.5-8 Hz, over the last
 at 0.25-0.50 m/s. Medians over the 2026-10-08 runs: asphalt 2.2, red rubber
 path 0.51, wood chips 0.41, grass/dirt 0.29. The RMS planned at first only
 follows the speed (about 1.0 x speed on every surface), see docs/PROGRESS.md.
+
+The node (`src/terrain_imu`) publishes **NaN** when the mean speed over the
+window is outside 0.25-0.50 m/s or fewer than 180 samples have arrived, so a
+consumer that keeps the latest value never carries an old number into a
+stretch where it means nothing. The window is the last 180 messages, not the
+last 1.8 s of stamps, because the Xsens stamps arrive in bursts.
+`/terrain/imu_roughness_debug` carries `{"roughness", "ratio", "speed"}`
+(`null` instead of NaN), where `ratio` is the value whatever the speed.
 
 ### `/ground/rgb_terrain` and `/terrain/imu_terrain`
 
