@@ -1,0 +1,76 @@
+{
+  "model_file": "rgb_terrain_v1.onnx",
+  "classes": [
+    "asphalt",
+    "red_path",
+    "wood_chips",
+    "grass_dirt",
+    "tile"
+  ],
+  "patch_boxes_xywh": [
+    [
+      20,
+      0,
+      200,
+      200
+    ],
+    [
+      220,
+      0,
+      200,
+      200
+    ],
+    [
+      420,
+      0,
+      200,
+      200
+    ],
+    [
+      20,
+      200,
+      200,
+      200
+    ],
+    [
+      220,
+      200,
+      200,
+      200
+    ],
+    [
+      420,
+      200,
+      200,
+      200
+    ]
+  ],
+  "frame_size_wh": [
+    640,
+    480
+  ],
+  "input_size": 224,
+  "mean": [
+    0.485,
+    0.456,
+    0.406
+  ],
+  "std": [
+    0.229,
+    0.224,
+    0.225
+  ],
+  "input": "RGB patches cut at patch_boxes, resized to input_size, /255, (x - mean) / std, NCHW",
+  "output": "logits per patch; softmax, average over the patches of a frame",
+  "backbone": "mobilenet_v3_small",
+  "trained_on": [
+    "corridor_book_1338_indoor",
+    "corridor_book_1434_indoor_books",
+    "corridor_groundtruth_1447",
+    "crossing_slow_1652",
+    "garden_surfaces_1548",
+    "garden_surfaces_1607",
+    "garden_surfaces_1618",
+    "garden_surfaces_1628"
+  ]
+}

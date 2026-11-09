@@ -10,6 +10,7 @@ def generate_launch_description():
         'use_sim_time': ('false', bool),
         'image_topic': ('/camera/camera/color/image_raw', str),
         'rate_hz': ('2.0', float),
+        'min_confidence': ('0.5', float),
     }
     return LaunchDescription(
         [DeclareLaunchArgument(name, default_value=default) for name, (default, _) in args.items()]

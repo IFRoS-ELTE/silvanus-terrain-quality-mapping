@@ -84,8 +84,63 @@ ros2 launch rgb_terrain rgb_terrain.launch.py              # live camera
 ros2 launch rgb_terrain rgb_terrain.launch.py use_sim_time:=true   # with ros2 bag play --clock
 ```
 
-Publishes `{"label": "grass_dirt", "confidence": 0.87}` on `/ground/rgb_terrain` at 2 Hz. One frame takes about 8 ms on a laptop CPU. Needs `onnxruntime`, which the Dockerfile already installs for the crack node.
+Publishes `{"label": "grass_dirt", "confidence": 0.87}` on `/ground/rgb_terrain` at 2 Hz, or `"unknown"` when the confidence is below `min_confidence` (default 0.5). One frame takes about 28 ms on a single laptop CPU thread. Needs `onnxruntime`, which the Dockerfile already installs for the crack node.
 
-## Results
+The model files are `src/rgb_terrain/models/rgb_terrain_v1.json` (in git) and `rgb_terrain_v1.onnx` (6.1 MB, not in git; GitHub release `terrain-model-v1`, sha256 `12203c836fcc3b565680fa0f908def67d7cead2cb54ae22b679090261cca877c`). The node has not been run under ROS yet.
 
-To be filled in after the first run on the server: per-surface accuracy for both folds, the pooled confusion matrix, and the CPU time per frame.
+## Results (v1, 2026-11-09)
+
+Run `runs/terrain_mnv3s_20261109_105815` on the GPU server: MobileNetV3-small, 12 epochs, about 15 s per epoch. Every number below is on runs the model never trained on, one answer per frame.
+
+**Reported fold: test on `garden_surfaces_1628` (outdoor) and `corridor_groundtruth_1447` (indoor).** 195 frames, accuracy 99.0 %, balanced accuracy 98.6 %.
+
+| Surface | Test frames | Accuracy | Precision |
+|---|---|---|---|
+| asphalt | 36 | 100 % | 100 % |
+| red path | 34 | 100 % | 100 % |
+| wood chips | 28 | 92.9 % | 100 % |
+| grass/dirt | 25 | 100 % | 92.6 % |
+| tile | 72 | 100 % | 100 % |
+
+**Second fold: test on `garden_surfaces_1618` and `corridor_book_1338_indoor`.** 192 frames, all correct.
+
+**Both folds together:** 387 frames, accuracy 99.5 %, balanced accuracy 99.1 %. The only mistakes are 2 wood-chip frames called grass/dirt.
+
+<p align="center">
+  <img src="media/terrain_confusion_1628_1447.png" width="55%" alt="Confusion matrix of the reported fold">
+</p>
+
+**The two mistakes.** Both are in 1628 at 42-43 s, at the end of the wood-chip stretch. The frames show the wood chips thinning out into dirt there; from 43 s it is dirt with a few chips. So the model is arguably right and the hand-written boundary (45 s) is late. The table still scores them as mistakes: moving a label after seeing the model's answer would be tuning on the test set.
+
+**Why the score is this high, and what it does not show.**
+- The five surfaces look very different from each other (the red path is red, tile is white and regular).
+- The 2 s margins remove exactly the frames where two surfaces meet.
+- All outdoor runs were recorded on one afternoon in one park, in the same light. Another day, wet ground or low sun has not been tested.
+- So the result says the camera separates these five surfaces reliably on our recordings. It does not say how it does on surfaces or conditions it has not seen.
+
+**Whole runs, including the boundaries.** `scripts/terrain_timeline.py` classifies every frame of a held-out run, 2 per second, including transitions and stretches without a class (kerb, concrete patch). Top band: the labels. Bottom band: the model. Below: its confidence.
+
+<p align="center">
+  <img src="media/terrain_timeline_1628.png" width="95%" alt="Labelled vs predicted surface over the whole run 1628">
+</p>
+
+| Run (held out) | Inside the labelled stretches | Every labelled frame, boundaries included |
+|---|---|---|
+| garden_surfaces_1628 | 98.4 % | 96.1 % |
+| garden_surfaces_1618 | 100 % | 97.0 % |
+
+Every surface change is found, typically within 1 to 3 s of the hand-written time. Some of that offset is expected: the camera looks about a metre ahead of the robot. The confidence drops at each change (to about 0.5), which is the behaviour we want.
+
+**Surfaces it has no class for.** `garden_surfaces_1536` was never used in training and contains ground outside the five classes. Final model, frame by frame:
+
+| Stretch | Ground | Model says | Mean confidence |
+|---|---|---|---|
+| 0-5 s | tiles at the door | tile | 0.92 |
+| 43-49 s | metal drain grate | mostly tile | 0.31 |
+| 60-90 s | smooth concrete | asphalt | 0.92 |
+
+Low confidence catches the drain grate, which is why the node publishes `unknown` below 0.5. Concrete is the real gap: it is called asphalt with high confidence. Adding a `concrete` class needs labelled concrete frames (1536 has about 40 s of it).
+
+**On the robot.** The exported ONNX model gives the same logits as PyTorch (largest difference 0.00005). With the node's OpenCV resize the probabilities differ from training by at most 0.008 on `garden_surfaces_1628` (same label on 90 of 90 frames). It takes 28 ms per frame on one laptop CPU thread.
+
+Files: `docs/media/terrain_confusion_1628_1447.png`, `terrain_confusion_pooled.png`, `terrain_timeline_1628.png`, `terrain_timeline_1618.png`, `terrain_timeline_1536_unseen_surfaces.png`.
