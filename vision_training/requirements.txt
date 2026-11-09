@@ -13,4 +13,5 @@ torchvision
 rosbags>=0.10
 onnx
 onnxruntime
+opencv-python-headless
 pytest

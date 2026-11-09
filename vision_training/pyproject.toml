@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-onnx = ["onnx", "onnxruntime"]
+onnx = ["onnx", "onnxruntime", "opencv-python-headless"]   # opencv: the deploy wrappers resize patches with it
 dev = ["pytest"]
 
 [tool.setuptools.packages.find]
