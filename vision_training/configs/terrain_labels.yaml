@@ -1,0 +1,51 @@
+# Surface labels for the RGB terrain classifier.
+#
+# Copied from docs/DATA.md ("Outdoor runs, 2026-10-08" and the indoor bags).
+# Times are seconds from the first colour frame of each bag, the same clock
+# tools/bag_to_images.py uses. If DATA.md changes, change this file too.
+#
+# Each segment is [start, end, class]. Frames closer than `margin_s` to a
+# segment boundary are dropped, because the labels are only good to a few
+# seconds and the camera looks about a metre ahead of the robot, so it sees
+# the next surface before the robot is on it.
+#
+# Things we leave out on purpose: the kerb (a short edge, not a surface),
+# the single concrete patch (~73 s in 1548, too short for its own class),
+# the door threshold and drain grate in 1536, and everything recorded after
+# the camera dropped out in 1607.
+
+margin_s: 2.0
+
+classes: [asphalt, red_path, wood_chips, grass_dirt, tile]
+
+bags:
+  garden_surfaces_1548:
+    - [0, 10, asphalt]
+    - [12, 55, grass_dirt]
+    - [57, 72, asphalt]          # cracked asphalt, still asphalt for this classifier
+    - [76, 87, asphalt]
+  garden_surfaces_1607:
+    - [0, 6, asphalt]            # cracked asphalt
+    - [8, 30, grass_dirt]
+    - [31, 43.8, red_path]       # camera stops at 43.8 s
+  garden_surfaces_1618:
+    - [0, 36, asphalt]           # cracked asphalt, driven slowly
+    - [38, 60, grass_dirt]
+    - [62, 75, red_path]
+    - [77, 89, wood_chips]       # wood chips and leaves
+  garden_surfaces_1628:
+    - [0, 21, red_path]
+    - [27, 45, wood_chips]       # wood chips and leaves
+    - [46, 65, grass_dirt]       # dirt with sparse grass
+    - [67, 89, asphalt]
+  # Indoor bags: plain tile floor the whole way. The objects placed in some of
+  # them (books, foam, wood) cover a small part of the frame; the patch vote
+  # handles that.
+  corridor_book_1338_indoor:
+    - [0, 33, tile]
+  corridor_book_1434_indoor_books:
+    - [0, 33, tile]
+  corridor_groundtruth_1447:
+    - [0, 40, tile]
+  crossing_slow_1652:
+    - [0, 90, tile]

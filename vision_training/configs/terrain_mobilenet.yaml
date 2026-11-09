@@ -1,0 +1,43 @@
+# RGB terrain classifier v1: pretrained MobileNetV3-small on ground patches.
+#
+#   python scripts/terrain_train.py --config configs/terrain_mobilenet.yaml
+#
+# Paths are relative to vision_training/. Override any value on the command
+# line, e.g. model.backbone=resnet18 train.epochs=20.
+
+experiment: terrain_mnv3s
+seed: 42
+device: auto
+output_dir: runs
+
+data:
+  root: data/terrain                 # written by scripts/terrain_extract.py
+  labels: configs/terrain_labels.yaml
+  robot_mask: ../src/crack_detection/models/robot_mask_color.png   # white = ground
+  patch_size: 200                    # px in the 640x480 frame
+  patch_rows: 2
+  patch_cols: 3
+  input_size: 224
+  num_workers: 4
+
+# Each fold trains on every labelled bag except its test bags, then tests on
+# runs the model has never seen. The first fold is the one we report: 1628
+# has all four outdoor surfaces, 1447 is the indoor tile test bag (the same
+# one the crack model uses). The second fold swaps in 1618 and 1338 to show
+# how much the result depends on which run was held out.
+folds:
+  - name: test_1628_1447
+    test_bags: [garden_surfaces_1628, corridor_groundtruth_1447]
+  - name: test_1618_1338
+    test_bags: [garden_surfaces_1618, corridor_book_1338_indoor]
+
+model:
+  backbone: mobilenet_v3_small
+  pretrained: true
+
+train:
+  epochs: 12          # fixed in advance; there is no separate validation run to tune on
+  batch_size: 64
+  lr: 0.0003
+  weight_decay: 0.0001
+  label_smoothing: 0.1

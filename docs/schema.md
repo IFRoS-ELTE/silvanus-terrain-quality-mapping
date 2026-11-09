@@ -51,7 +51,7 @@ Published by the lab stack. We only read them. Names exactly as in our bags.
 | `/crack_detection/points` | `sensor_msgs/PointCloud2` | crack node | fusion, RViz | exists |
 | `/crack_detection/markers` | `visualization_msgs/MarkerArray` | crack node | RViz | exists |
 | `/crack_detection/camera_info` | `sensor_msgs/CameraInfo` | crack node | viewing | exists |
-| `/ground/rgb_terrain` | `std_msgs/String` (JSON) | RGB terrain classifier | fusion | planned |
+| `/ground/rgb_terrain` | `std_msgs/String` (JSON) | RGB terrain classifier (`src/rgb_terrain`) | fusion | exists, model training |
 | `/terrain/imu_roughness` | `std_msgs/Float32` | IMU roughness node | fusion, governor | planned |
 | `/terrain/imu_terrain` | `std_msgs/String` (JSON) | IMU terrain classifier | fusion | planned |
 | `/terrain/speed_limit` | `std_msgs/Float32` | fusion | governor | planned |
@@ -134,10 +134,10 @@ follows the speed (about 1.0 x speed on every surface), see docs/PROGRESS.md.
 ### `/ground/rgb_terrain` and `/terrain/imu_terrain`
 
 ```json
-{"label": "grass", "confidence": 0.87}
+{"label": "grass_dirt", "confidence": 0.87}
 ```
 
-Labels are fixed: `tile`, `concrete`, `asphalt`, `grass`, `gravel`, `dirt`.
+Labels of `/ground/rgb_terrain`: `asphalt`, `red_path`, `wood_chips`, `grass_dirt`, `tile`, the surfaces we have labelled recordings of (`docs/DATA.md`). `confidence` is the mean class probability over the frame's ground patches. The IMU classifier may use its own subset; tell the team before adding a label to either.
 
 ### `/terrain/speed_limit`
 
