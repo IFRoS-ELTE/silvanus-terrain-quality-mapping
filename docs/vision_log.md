@@ -170,22 +170,34 @@ CPU timing: laptop, 8 threads, ONNX Runtime. Robot CPU not measured yet.
 - **Gripper in the colour frames** (small part at the bottom of every frame, see the team screenshot of 2026-10-15). Decision: **mask, do not crop.** Cropping shifts pixel coordinates (the 3D step would need corrected intrinsics) and the gripper is not a full-width band, so a crop wastes good ground. With a mask the model sees the full frame and the probability under the mask is set to zero, so no detection can land on the gripper. The depth mask (848x480) cannot be reused for colour (different field of view).
 - New `scripts/make_robot_mask.py`: builds the colour mask from frames of several bags. The gripper is static in the image while the ground changes, so pixels with low variance over time are the robot; only regions touching the bottom edge are kept, then grown by 8 px for arm shake. Writes a preview for checking; `--bottom-rows N` is the simple fallback. One new test (17 in total).
 
+### 2026-11-09: RGB terrain classifier pipeline (week 6)
+
+Request from the team lead: terrain classifier v1 with accuracy per surface on an unseen run and a confusion matrix, `/ground/rgb_terrain` if there is time, plus running Aritra's crack fine-tune on the GPU server.
+
+Built on branch `yamin-terrain-classifier` (details and runbook: `docs/terrain_classifier.md`):
+- `configs/terrain_labels.yaml`: the surface time ranges from `docs/DATA.md`, 2 s margin at every boundary. Left out on purpose: kerb, the single concrete patch, door threshold and drain grate, anything after the camera dropped out in 1607.
+- `terrainclf.bagframes`: reads colour frames from `.mcap` bags with `rosbags` (pure Python), so frame extraction runs on the GPU server without ROS. Times count from the first colour frame, like `tools/bag_to_images.py`. Tested on a synthetic `.mcap` bag written in the test.
+- Six 200x200 ground patches per frame in a 2x3 grid ending at the top of the colour robot mask (row 400). The frame label is the average of its patch probabilities.
+- MobileNetV3-small, ImageNet-pretrained, 1.5M parameters; class-balanced sampling (wood chips is the smallest class); 12 epochs fixed in advance. ONNX on a laptop CPU: about 8 ms per frame.
+- Two folds by bag: `test_1628_1447` (reported; 1628 has all four outdoor surfaces, 1447 is the indoor test bag the crack model also uses) and `test_1618_1338`. Output: per-surface accuracy and precision table, balanced accuracy, confusion matrix PNG (one blue ramp, row percentages and counts), pooled over folds.
+- `src/rgb_terrain/`: ROS 2 node publishing `{"label", "confidence"}` on `/ground/rgb_terrain` at 2 Hz from the newest frame. Not run under ROS yet (no ROS on the development laptop); the classifier wrapper it uses is tested against PyTorch.
+- `docs/schema.md`: the label list for `/ground/rgb_terrain` changed from the old placeholder (`tile, concrete, asphalt, grass, gravel, dirt`) to the surfaces we actually have recordings of: `asphalt, red_path, wood_chips, grass_dirt, tile`.
+- 23 tests pass (6 new).
+
+Checked: the `crack-model-v1` tag exists on GitHub.
+
 ## 4. Next steps
 
 Crack model (Aritra, steps in `docs/crack_model.md`):
-1. Download v1, extract frames, make the colour gripper mask.
-2. Measure v1 on our frames: detection rate on cracked asphalt (`1618` 0-36 s, `1548` 57-72 s), false alarms on indoor tile.
-3. U-Net in the crack node.
-4. Annotate (about 120 crack frames, 150 negatives), fine-tune on the GPU server with `finetune_robot.yaml`, export v2. Test bags: `garden_surfaces_1548` + `corridor_groundtruth_1447`.
-5. Cracks in 3D as `Detection3DArray` on `/crack_detection/hazards`.
-6. Only if v2 is still weak: CrackSeg9k pretraining, Crack500, or an HrSegNet comparison on the robot test bag.
-
-Yamin:
-- Publish the `crack-model-v1` release (onnx + pt) on GitHub.
-- Run Aritra's fine-tuning on the GPU server when the annotations are ready.
+1. Annotate (about 120 crack frames, 150 negatives with indoor tile among them), so grout lines stop being detected as cracks.
+2. Fine-tune on the GPU server with `finetune_robot.yaml` (Yamin runs it), export v2.
+3. Test v1 and v2 on `garden_surfaces_1548` + `corridor_groundtruth_1447`: Dice, IoU, false positives per metre, in one table in `docs/crack_model.md`.
+4. Cracks in 3D as `Detection3DArray` on `/crack_detection/hazards`.
 
 Terrain (Yamin):
-7. RGB terrain classifier v1: frames from the 5 outdoor bags at the labelled time ranges (2 s margin at each boundary), ground-region crops below the horizon and outside the robot mask, classes asphalt / red path / wood chips / grass-dirt (+ tile from indoor bags). Pretrained small CNN, split by bag, accuracy per surface on an unseen run. Publishes `{"label", "confidence"}` on `/ground/rgb_terrain`.
+5. Copy the 8 labelled bags to the GPU server, run `terrain_extract.py` and `terrain_train.py`, and put the per-surface table and confusion matrix into `docs/terrain_classifier.md` and the README.
+6. Train the `--final` model, export it, copy it into `src/rgb_terrain/models/`, and run the node on a bag with ROS.
+7. Run Aritra's fine-tune when his annotations are ready.
 
 Dropped: the spare D435 home experiments (real robot bags exist and the arm pose is chosen, `docs/robot/arm_pose.md`), and our own depth hazard node (exists in `ground_demo/`).
 

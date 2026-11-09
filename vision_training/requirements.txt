@@ -1,6 +1,6 @@
 # CPU setup for a laptop. On the GPU server install torch from the
 # PyTorch index that matches the CUDA version there first, for example
-#   pip install torch --index-url https://download.pytorch.org/whl/cu121
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 # and then run `pip install -e .[onnx,dev]` as usual.
 numpy
 pillow
@@ -9,6 +9,8 @@ pyyaml
 tqdm
 matplotlib
 torch>=2.1
+torchvision
+rosbags>=0.10
 onnx
 onnxruntime
 pytest
