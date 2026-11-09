@@ -193,6 +193,18 @@ Checked: the `crack-model-v1` tag exists on GitHub.
 - Label check by eye: three ranges in `docs/DATA.md` are off by a few seconds (1548 starts on a mossy concrete patch, not asphalt; in 1607 the red path starts at 36 s, not 31 s; in 1628 grass/dirt ends at 62.5 s, then a concrete patch). Corrected in `configs/terrain_labels.yaml`, with what the frames show next to each line. Without the fix, about 20 frames would have been trained with the wrong surface.
 - Laptop CPU training speed: about 5 min per epoch over all patches, so both folds and the final model take about 2.5 to 3 hours. On the GPU server it is minutes; only `data/terrain/` (271 MB) needs to go there, not the bags.
 
+### 2026-11-09 (evening): terrain classifier v1 results
+
+Trained on the GPU server (`runs/terrain_mnv3s_20261109_105815`, 15 s per epoch), final model `runs/terrain_mnv3s_final_20261109_110457`, both copied to `D:\ifros_labrom_server`. Full write-up with figures: `docs/terrain_classifier.md`.
+
+- Held-out runs 1628 + 1447: 99.0 % of 195 frames (wood chips 92.9 %, everything else 100 %). Held-out runs 1618 + 1338: 100 % of 192 frames. Pooled: 99.5 % of 387, balanced 99.1 %.
+- The only 2 mistakes are wood-chip frames in 1628 at 42-43 s. The frames show the chips thinning into dirt there, so the label boundary is probably late. Not relabelled: that would be tuning on the test set.
+- Honest reading: the five surfaces look very different, the 2 s margins remove the hard transition frames, and all outdoor runs come from one afternoon. The score shows the classifier works on our recordings, not on other days or unseen surfaces.
+- New `scripts/terrain_timeline.py`: classifies every frame of a held-out run including boundaries. 1628: 96.1 % on every labelled frame, 1618: 97.0 %. Surface changes are found within 1-3 s of the hand-written times, with a confidence dip at each.
+- Unseen surfaces (`garden_surfaces_1536`, never in training): door tiles correct, metal drain grate gets confidence 0.31, smooth concrete is called asphalt with confidence 0.92. So the node now publishes `unknown` below `min_confidence` 0.5 (schema updated); concrete needs its own class and labelled frames.
+- Export checked: ONNX logits match PyTorch to 5e-5; with the node's OpenCV resize, probabilities match training within 0.008 on 1628 (90/90 same label). 28 ms per frame on one laptop CPU thread.
+- Model files in `src/rgb_terrain/models/` (JSON in git, ONNX to the `terrain-model-v1` release). README section 3 and the progress table updated.
+
 ## 4. Next steps
 
 Crack model (Aritra, steps in `docs/crack_model.md`):
@@ -202,9 +214,10 @@ Crack model (Aritra, steps in `docs/crack_model.md`):
 4. Cracks in 3D as `Detection3DArray` on `/crack_detection/hazards`.
 
 Terrain (Yamin):
-5. Copy the 8 labelled bags to the GPU server, run `terrain_extract.py` and `terrain_train.py`, and put the per-surface table and confusion matrix into `docs/terrain_classifier.md` and the README.
-6. Train the `--final` model, export it, copy it into `src/rgb_terrain/models/`, and run the node on a bag with ROS.
+5. ~~Train and evaluate the terrain classifier~~ Done, see above. Publish `rgb_terrain_v1.onnx` as the GitHub release `terrain-model-v1`.
+6. Run the `rgb_terrain` node on a bag under ROS (not run yet), and give it to the fusion side.
 7. Run Aritra's fine-tune when his annotations are ready.
+8. Optional: a `concrete` class from the concrete in `garden_surfaces_1536`; terrain on another day or in other light.
 
 Dropped: the spare D435 home experiments (real robot bags exist and the arm pose is chosen, `docs/robot/arm_pose.md`), and our own depth hazard node (exists in `ground_demo/`).
 

@@ -7,7 +7,13 @@ second and publishes the JSON from docs/schema.md:
 
 The surface changes slowly compared with 30 Hz video, so we keep only the
 newest frame and classify it on a timer (2 Hz by default) instead of on
-every image. One inference takes a few milliseconds on a laptop CPU.
+every image. One inference takes about 30 ms on one laptop CPU thread.
+
+Below `min_confidence` the label is "unknown". The model only knows five
+surfaces; on ground it has never seen (the drain grate in garden_surfaces_1536)
+its confidence drops to about 0.3, and "unknown" is more useful to fusion than
+a guess. It does not catch everything: smooth concrete is called asphalt with
+high confidence, because the two look alike and there is no concrete class.
 """
 
 import json
@@ -44,9 +50,11 @@ class RgbTerrainNode(Node):
         self.declare_parameter("model_path", str(models / "rgb_terrain_v1.onnx"))
         self.declare_parameter("rate_hz", 2.0)
         self.declare_parameter("num_threads", 1)
+        self.declare_parameter("min_confidence", 0.5)
         g = lambda name: self.get_parameter(name).value  # noqa: E731
 
         self.clf = TerrainClassifier(g("model_path"), num_threads=g("num_threads"))
+        self.min_confidence = float(g("min_confidence"))
         self.lock = Lock()
         self.latest = None
         self.pub = self.create_publisher(String, g("output_topic"), 10)
@@ -70,6 +78,8 @@ class RgbTerrainNode(Node):
         except ValueError as exc:
             self.get_logger().error(f"Terrain classification failed: {exc}", throttle_duration_sec=5.0)
             return
+        if confidence < self.min_confidence:
+            label = "unknown"
         self.pub.publish(String(data=json.dumps({"label": label, "confidence": round(confidence, 3)})))
 
 

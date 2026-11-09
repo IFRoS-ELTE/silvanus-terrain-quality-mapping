@@ -32,3 +32,6 @@ Thumbs.db
 bags/
 frames/
 *.txt.gz
+
+# Archives made to move data between machines
+*.tar.gz

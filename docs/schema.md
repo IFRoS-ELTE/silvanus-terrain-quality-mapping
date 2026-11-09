@@ -137,7 +137,7 @@ follows the speed (about 1.0 x speed on every surface), see docs/PROGRESS.md.
 {"label": "grass_dirt", "confidence": 0.87}
 ```
 
-Labels of `/ground/rgb_terrain`: `asphalt`, `red_path`, `wood_chips`, `grass_dirt`, `tile`, the surfaces we have labelled recordings of (`docs/DATA.md`). `confidence` is the mean class probability over the frame's ground patches. The IMU classifier may use its own subset; tell the team before adding a label to either.
+Labels of `/ground/rgb_terrain`: `asphalt`, `red_path`, `wood_chips`, `grass_dirt`, `tile`, the surfaces we have labelled recordings of (`docs/DATA.md`), or `unknown` when the confidence is below the node's `min_confidence` (default 0.5). `confidence` is the mean class probability over the frame's ground patches. The IMU classifier may use its own subset; tell the team before adding a label to either.
 
 ### `/terrain/speed_limit`
 

@@ -26,7 +26,8 @@ The short version: **the camera predicts, the IMU confirms.**
 | 2 | Crack model trained and released for the robot | Done, model v1 running in the crack node on our recordings |
 | 2 | Indoor map with SLAM, Nav2 to a goal on it | Done 27 Oct: the corridor loop closes to 1 cm, the robot drives to goals from RViz |
 | 2 | IMU roughness | The feature that separates surfaces is found; node not written yet |
-| 2 | RGB terrain classifier, annotation of our own frames | Started |
+| 2 | RGB terrain classifier | Done 9 Nov: 99.5 % of frames right on runs it never saw, five surfaces (section 3); ROS node written |
+| 2 | Annotation of our own crack frames | In progress |
 | 3 (15-21 Oct) | Zigzag coverage sweep | First sweep on the robot 27 Oct, Nav2 through the governor; its stall at a lane change is fixed and checked in simulation |
 | 3 | Speed governor: slow down so the IMU can feel a hazard, stop before obstacles | Live on the robot 27 Oct: slows to 0.2 m/s, feels 10-74 mm plates, stops for walls and tall objects |
 | 3 | Camera and IMU fused, hazard classes A/B/C | Done offline on our recordings (section 6), live in the governor |
@@ -111,6 +112,26 @@ One whole outdoor run, the driven path and both roughness numbers along it. Both
 Videos: [the run with detections and height map](docs/media/outdoor_run_1628.mp4) (90 s), [the robot outdoors from a phone](docs/media/robot_outdoor_1618.mp4).
 
 On grass and wood chips the fixed 15 mm bump threshold also boxes tufts and leaves as 12-19 mm bumps. Off pavement, the threshold has to follow the unevenness of the surface.
+
+### Which surface: the RGB terrain classifier
+
+Depth and the IMU say how rough the ground is. The colour camera adds what the surface is: asphalt, red rubber path, wood chips, grass/dirt or indoor tile. A small pretrained network (MobileNetV3-small) looks at six ground patches above the robot mask in each frame and averages them into one answer per frame. It was trained on our own outdoor and indoor recordings and tested on runs it never saw:
+
+| Surface | Test frames | Accuracy |
+|---|---|---|
+| Asphalt | 100 | 100 % |
+| Red rubber path | 52 | 100 % |
+| Wood chips | 44 | 95.5 % |
+| Grass / dirt | 61 | 100 % |
+| Tile (indoor) | 130 | 100 % |
+
+387 frames from four held-out runs, 99.5 % right. Over a whole held-out run, boundaries included, it follows every surface change within a few seconds, and its confidence drops where two surfaces meet:
+
+<p align="center">
+  <img src="docs/media/terrain_timeline_1628.png" width="95%" alt="Labelled and predicted surface over the whole outdoor run 1628, with the model's confidence">
+</p>
+
+The surfaces are visually distinct and all outdoor runs were recorded on one afternoon, so this shows the classifier works on our recordings, not yet on other days or surfaces. On a run with ground it has no class for, it calls smooth concrete "asphalt" with high confidence. A metal drain grate gets low confidence, so the node publishes `unknown` there. Details, both folds and the confusion matrix: [docs/terrain_classifier.md](docs/terrain_classifier.md).
 
 ## 4. Cracks
 
