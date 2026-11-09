@@ -186,6 +186,13 @@ Built on branch `yamin-terrain-classifier` (details and runbook: `docs/terrain_c
 
 Checked: the `crack-model-v1` tag exists on GitHub.
 
+### 2026-11-09 (later): frames extracted, labels checked
+
+- All 10 bags downloaded from the Drive to the laptop (`D:ags`, 33 GB). The Drive zip download splits them: big `.mcap` files arrive loose as `<bag>_0-00N.mcap`, the rest in zips. Rebuilt one folder per bag.
+- `terrain_extract.py` on the laptop: reading the bags is fast (about 4 s per bag, 76 s for all), 788 labelled frames, 271 MB. Frame counts per surface in `docs/terrain_classifier.md`.
+- Label check by eye: three ranges in `docs/DATA.md` are off by a few seconds (1548 starts on a mossy concrete patch, not asphalt; in 1607 the red path starts at 36 s, not 31 s; in 1628 grass/dirt ends at 62.5 s, then a concrete patch). Corrected in `configs/terrain_labels.yaml`, with what the frames show next to each line. Without the fix, about 20 frames would have been trained with the wrong surface.
+- Laptop CPU training speed: about 5 min per epoch over all patches, so both folds and the final model take about 2.5 to 3 hours. On the GPU server it is minutes; only `data/terrain/` (271 MB) needs to go there, not the bags.
+
 ## 4. Next steps
 
 Crack model (Aritra, steps in `docs/crack_model.md`):
