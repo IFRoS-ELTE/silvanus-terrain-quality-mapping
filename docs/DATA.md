@@ -101,10 +101,10 @@ camera and checked against phone videos. The phone clock runs **239 s behind the
 | Bag | Surfaces (bag time, s) | Notes |
 |---|---|---|
 | `garden_surfaces_1536` | tile 0-5, door threshold ~33, metal drain grate 43-48, smooth concrete, parked 60-90 | driving out of the building. **No odometry**, no GNSS fix |
-| `garden_surfaces_1548` | asphalt 0-10, grass/dirt 12-55, cracked asphalt 57-72, concrete patch ~73, asphalt 76-87 | complete. GNSS fix, about +-10 m |
-| `garden_surfaces_1607` | cracked asphalt 0-6, grass/dirt 8-30, red rubber path 31-44 (kerb at each edge), dirt with leaves 46-62, asphalt 63-70, grass/dirt 72-87 | **camera stops at 43.8 s**; labels after that from the phone video. Driven up to 1.2 m/s |
+| `garden_surfaces_1548` | mossy concrete 2.5-6.5 (asphalt 4.5-10), grass/dirt 12-55, cracked asphalt 57-72, concrete patch ~73, asphalt 76-87 | complete. GNSS fix, about +-10 m |
+| `garden_surfaces_1607` | cracked asphalt 0-6, grass/dirt 8-34, kerb 34.7-35.7, red rubber path 36-44, dirt with leaves 46-62, asphalt 63-70, grass/dirt 72-87 | **camera stops at 43.8 s**; labels after that from the phone video. Driven up to 1.2 m/s |
 | `garden_surfaces_1618` | cracked asphalt 0-36 (slow), grass/dirt 38-60, red rubber path 62-75, wood chips/leaves 77-89 | complete. No GNSS fix |
-| `garden_surfaces_1628` | red rubber path 0-21, kerb 22-26, wood chips/leaves 27-45, dirt with sparse grass 46-65, asphalt 67-89 | complete. GNSS fix, about +-7 m |
+| `garden_surfaces_1628` | red rubber path 0-21, kerb 22-26, wood chips/leaves 27-45, dirt with sparse grass 46-62.5, concrete patch from 62.7, asphalt 66.8-89 | complete. GNSS fix, about +-7 m |
 
 Leave about 2 s out around each boundary; the labels are good to a few seconds.
 Cracked asphalt for crack detection: `1548` 57-72 s, `1618` 0-36 s.

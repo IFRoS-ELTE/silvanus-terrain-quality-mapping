@@ -162,6 +162,29 @@ def two_ways(gl):
     return any(min(x, 180 - x) < 2 for x in d) and any(abs(x - 90) < 2 for x in d)
 
 
+def flat_field(bag, path, t_start, every=15):
+    """Per-pixel gain (H, W, 3) that evens out the light across the camera image. Every frame is darker
+    towards its edges and has the arm's shadow in the same place, so a page laid from many frames came
+    out as a quilt of light and dark wedges (2026-11-04). The mean of the frames taken while driving,
+    over a run, is that pattern without the floor's own texture."""
+    r = hm.open_bag(bag, [hm.COLOR])
+    acc, n, k = None, 0, 0
+    while r.has_next():
+        _, data, st = r.read_next(); k += 1
+        if k % every:
+            continue
+        if not path["straight"][min(np.searchsorted(path["t"], st * 1e-9 - t_start), len(path["t"]) - 1)]:
+            continue
+        c = deserialize_message(data, Image)
+        img = np.frombuffer(c.data, np.uint8).reshape(c.height, c.width, 3).astype(np.float32)
+        acc = img if acc is None else acc + img
+        n += 1
+    if n < 20:
+        return None
+    mean = cv2.GaussianBlur(acc / n, (0, 0), 15)
+    return np.clip(mean.mean(axis=(0, 1)) / np.maximum(mean, 1.0), 0.5, 2.0)
+
+
 def grid_direction(bag, path, planes, T_bc, T_dc, t_start):
     """First pass: the direction (deg, 0-90, map frame) of the floor's straight lines, the median over
     every frame that is laid down, or None on a floor without them. Decided before laying anything, so
@@ -342,6 +365,7 @@ def main():
                 allowed[max(b - r, 0):b + r, max(a - r, 0):a + r] = 1
 
     G = grid_direction(bag, path, planes, T_bc, T_dc, t_start)
+    flat = flat_field(bag, path, t_start)
     r = hm.open_bag(bag, [hm.COLOR, hm.CINFO])
     Kc = rays = wgt = uu = vv = None
     n = 0; frames = {}
@@ -408,6 +432,8 @@ def main():
         centre = np.array(to_px(*hm.pose_at(path, t)[:2], exact=True), float)      # the robot, turning point
         c = deserialize_message(data, Image)
         img = np.frombuffer(c.data, np.uint8).reshape(c.height, c.width, 3)
+        if flat is not None:
+            img = np.clip(img * flat, 0, 255).astype(np.uint8)
         rgb = img if c.encoding == "rgb8" else img[:, :, ::-1]
         # line the frame up with the page so far: SLAM is good to a few cm, which put one grout
         # line down two or three times. The correction carries over to the next frame.

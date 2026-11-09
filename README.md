@@ -26,7 +26,7 @@ The short version: **the camera predicts, the IMU confirms.**
 | 2 | Crack model trained and released for the robot | Done, model v1 running in the crack node on our recordings |
 | 2 | Indoor map with SLAM, Nav2 to a goal on it | Done 27 Oct: the corridor loop closes to 1 cm, the robot drives to goals from RViz |
 | 2 | IMU roughness | Done 9 Nov: node publishes the fast/slow band ratio on `/terrain/imu_roughness`; checked on bag replay (section 3) |
-| 2 | RGB terrain classifier | Done 9 Nov: 99.5 % of frames right on runs it never saw, five surfaces (section 3); ROS node written |
+| 2 | RGB terrain classifier | Done 9 Nov: 99.5 % of frames right on runs it never saw, five surfaces (section 3); ROS node tested on a bag |
 | 2 | Annotation of our own crack frames | In progress |
 | 3 (15-21 Oct) | Zigzag coverage sweep | First sweep on the robot 27 Oct, Nav2 through the governor; its stall at a lane change is fixed and checked in simulation |
 | 3 | Speed governor: slow down so the IMU can feel a hazard, stop before obstacles | Live on the robot 27 Oct: slows to 0.2 m/s, feels 10-74 mm plates, stops for walls and tall objects |
@@ -244,8 +244,8 @@ The next step runs without a saved map and without a driver: live SLAM, one turn
 
 - **Week 3, done.** Crack U-Net in the robot's crack node with false-crack filters; camera and IMU fused into one map with the A/B/C classes; inspection map; speed governor, tested offline.
 - **Week 4, done.** At the robot: the scan fix, the indoor map with SLAM, Nav2 to goals, the speed governor live, a first sweep through it, a first try of the autonomous session with the live page.
-- **Week 5, now.** Everything together, first on one bag (done: the corridor sweep, section 6) and then live: the robot drives a lane by itself over a block, slows, crosses it, the IMU spike is logged and a confirmed marker appears on the live page. The parts all work on the robot; one autonomous run with all of them together is next. Still open from week 4: crossing runs at 0.2, 0.3 and 0.4 m/s, and labelled outdoor runs with repeats.
-- **Week 6, now.** RGB terrain classifier done (99.5 % on held-out runs, section 3) and its ROS node written; crack model v2 from our own annotated frames, with tile grout as "no crack" examples, tested against v1 on the two test runs.
+- **Week 5.** Everything together, first on one bag (done: the corridor sweep, section 6) and then live: the robot drives a lane by itself over a block, slows, crosses it, the IMU spike is logged and a confirmed marker appears on the live page. The parts all work on the robot; one autonomous run with all of them together is next. Still open from week 4: crossing runs at 0.2, 0.3 and 0.4 m/s, and labelled outdoor runs with repeats.
+- **Week 6, now.** RGB terrain classifier done (99.5 % on held-out runs, section 3) and its ROS node tested on bag 1628; crack model v2 from our own annotated frames, with tile grout as "no crack" examples, tested against v1 on the two test runs.
 - **Weeks 6-8.** Repeat runs, roughness vs speed, the camera unevenness vs IMU roughness comparison, hazard counts per class, the smallest hazard the robot feels, demo video and presentation.
 
 Every hazard will end up in one of three classes, which is the main result of the project:
