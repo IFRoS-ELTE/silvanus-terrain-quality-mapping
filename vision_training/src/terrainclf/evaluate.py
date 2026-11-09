@@ -9,6 +9,8 @@ import numpy as np
 
 # One blue ramp, light to dark (the team's chart palette), so a darker cell
 # simply means "more frames". Rainbows make amounts look like categories.
+DISPLAY = {"grass_dirt": "grass/dirt", "red_path": "red path", "wood_chips": "wood chips"}
+
 RAMP = ["#ffffff", "#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#184f95", "#0d366b"]
 
 
@@ -67,8 +69,8 @@ def plot_confusion(cm: np.ndarray, classes: list[str], path: Path, title: str) -
     ax.imshow(share, cmap=cmap, vmin=0, vmax=1)
     for i in range(len(classes)):
         for j in range(len(classes)):
-            if rows[i, 0] == 0:
-                continue
+            if rows[i, 0] == 0 or cm[i, j] == 0:
+                continue  # empty cells stay blank, so the mistakes stand out
             dark = share[i, j] > 0.55
             ax.text(j, i, f"{share[i, j]:.0%}\n{cm[i, j]}", ha="center", va="center", fontsize=9,
                     color="white" if dark else "#1f1f1f")
@@ -77,8 +79,9 @@ def plot_confusion(cm: np.ndarray, classes: list[str], path: Path, title: str) -
     ax.set_yticks(np.arange(len(classes) + 1) - 0.5, minor=True)
     ax.grid(which="minor", color="white", linewidth=2)
     ax.tick_params(which="minor", length=0)
-    ax.set_xticks(range(len(classes)), [c.replace("_", " ") for c in classes], rotation=30, ha="right")
-    ax.set_yticks(range(len(classes)), [c.replace("_", " ") for c in classes])
+    names = [DISPLAY.get(c, c.replace("_", " ")) for c in classes]
+    ax.set_xticks(range(len(classes)), names, rotation=30, ha="right")
+    ax.set_yticks(range(len(classes)), names)
     ax.set_xlabel("predicted")
     ax.set_ylabel("true surface")
     ax.set_title(title, fontsize=10, loc="left")
