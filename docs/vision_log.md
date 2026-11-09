@@ -205,6 +205,15 @@ Trained on the GPU server (`runs/terrain_mnv3s_20261109_105815`, 15 s per epoch)
 - Export checked: ONNX logits match PyTorch to 5e-5; with the node's OpenCV resize, probabilities match training within 0.008 on 1628 (90/90 same label). 28 ms per frame on one laptop CPU thread.
 - Model files in `src/rgb_terrain/models/` (JSON in git, ONNX to the `terrain-model-v1` release). README section 3 and the progress table updated.
 
+### 2026-11-09 (night): IMU roughness node and roughness per surface
+
+Requested by the team lead: the IMU roughness node on bag replay, and the box plots per surface plus camera unevenness against IMU roughness per 0.25 m, with the checked surface labels. Write-up: `docs/surface_roughness.md`.
+
+- `src/terrain_imu/`: node publishing the 8-50 Hz / 0.5-8 Hz power ratio of `/filter/free_acceleration` on `/terrain/imu_roughness` at 4 Hz, NaN outside 0.25-0.50 m/s, plus a JSON debug topic. The maths is in `terrain_imu/roughness.py` (numpy only), the same formula as `tools/analysis/outdoor_figures.py`; 5 tests without ROS. Not run under ROS yet.
+- `tools/analysis/surface_roughness.py`: replays six bags (1548, 1607, 1618, 1628, 1447, 1652) through the node's class at 4 Hz, computes camera unevenness as in `outdoor_figures.py`, and writes one record per 0.25 m (camera frames shifted 0.85 m for the look-ahead). 640 pieces, 410 labelled. 11 minutes on the laptop, no ROS.
+- Medians per surface reproduce PROGRESS.md: camera within 0.3 mm; IMU equal for wood chips and grass/dirt, asphalt 2.55 vs 2.2 and red path 0.31 vs 0.51 (per-distance vs per-time sampling, corrected labels, few red-path pieces).
+- Camera unevenness against IMU roughness: Spearman rho = -0.54 over 239 pieces, and no positive relation inside any surface. The camera measures shape, the band ratio measures hardness. Reported as complementary signals, not as "the camera predicts the IMU". For the team lead: the bump-check figure should use crossing jolts instead.
+
 ## 4. Next steps
 
 Crack model (Aritra, steps in `docs/crack_model.md`):

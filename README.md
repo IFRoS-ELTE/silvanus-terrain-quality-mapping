@@ -25,7 +25,7 @@ The short version: **the camera predicts, the IMU confirms.**
 | 2 (8-14 Oct) | Outdoor localization tested | Done offline, wheel speed + IMU heading works best |
 | 2 | Crack model trained and released for the robot | Done, model v1 running in the crack node on our recordings |
 | 2 | Indoor map with SLAM, Nav2 to a goal on it | Done 27 Oct: the corridor loop closes to 1 cm, the robot drives to goals from RViz |
-| 2 | IMU roughness | The feature that separates surfaces is found; node not written yet |
+| 2 | IMU roughness | Done 9 Nov: node publishes the fast/slow band ratio on `/terrain/imu_roughness`; checked on bag replay (section 3) |
 | 2 | RGB terrain classifier | Done 9 Nov: 99.5 % of frames right on runs it never saw, five surfaces (section 3); ROS node written |
 | 2 | Annotation of our own crack frames | In progress |
 | 3 (15-21 Oct) | Zigzag coverage sweep | First sweep on the robot 27 Oct, Nav2 through the governor; its stall at a lane change is fixed and checked in simulation |
@@ -139,6 +139,22 @@ Which surface it confused with which, on the held-out runs 1628 (outdoor) and 14
 
 The surfaces are visually distinct and all outdoor runs were recorded on one afternoon, so this shows the classifier works on our recordings, not yet on other days or surfaces. On a run with ground it has no class for, it calls smooth concrete "asphalt" with high confidence. A metal drain grate gets low confidence, so the node publishes `unknown` there. Details, both folds and the confusion matrix: [docs/terrain_classifier.md](docs/terrain_classifier.md).
 
+### Roughness per surface, camera against IMU
+
+One value per 0.25 m of driven path over six recordings, with the checked surface labels. Left: what the camera measures ahead of the robot. Right: what the IMU feels under the wheels (fast/slow shaking, from the new IMU roughness node):
+
+<p align="center">
+  <img src="docs/media/roughness_per_surface.png" width="95%" alt="Camera unevenness and IMU roughness per surface, box plots">
+</p>
+
+The camera separates flat ground (tile, asphalt, red path, 3.6-4.2 mm) from uneven ground (grass/dirt, wood chips, 6.7-7.6 mm). The IMU separates hard from soft: asphalt shakes fast, grass and wood chips slowly. Against each other, per 0.25 m, the two form two groups rather than a line (Spearman rho = -0.54):
+
+<p align="center">
+  <img src="docs/media/unevenness_vs_imu.png" width="65%" alt="Camera unevenness against IMU roughness per 0.25 m, coloured by surface">
+</p>
+
+So the two measure different things, shape and hardness, and together they tell the surfaces apart better than either alone. The band ratio is not the IMU number to check the camera's bump predictions against; for that we use the jolt when the wheels cross an object (section 2). Details: [docs/surface_roughness.md](docs/surface_roughness.md).
+
 ## 4. Cracks
 
 Depth cannot see thin cracks (the D435 noise is a few millimetres), so cracks come from the colour image with a segmentation network.
@@ -251,6 +267,7 @@ Every hazard will end up in one of three classes, which is the main result of th
 | [docs/schema.md](docs/schema.md) | Topic names and message formats |
 | [docs/crack_model.md](docs/crack_model.md) | Crack model: files, how to use it in the node, annotation and fine-tuning |
 | [docs/terrain_classifier.md](docs/terrain_classifier.md) | RGB terrain classifier: labels, training by held-out run, results, the ROS node |
+| [docs/surface_roughness.md](docs/surface_roughness.md) | IMU roughness node, roughness per surface, camera unevenness against IMU roughness |
 | [docs/vision_log.md](docs/vision_log.md) | Vision decisions and results, step by step |
 | [docs/robot/](docs/robot/) | Arm pose, IMU mount, how to run a robot session |
 | [tools/analysis/](tools/analysis/README.md) | Scripts that make every figure on this page |
