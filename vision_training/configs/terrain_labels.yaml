@@ -9,6 +9,10 @@
 # seconds and the camera looks about a metre ahead of the robot, so it sees
 # the next surface before the robot is on it.
 #
+# Four boundaries were corrected after looking at every frame around them
+# (2026-11-09); DATA.md was read from video and is off by a few seconds there.
+# Each corrected line says what the frames show.
+#
 # Things we leave out on purpose: the kerb (a short edge, not a surface),
 # the single concrete patch (~73 s in 1548, too short for its own class),
 # the door threshold and drain grate in 1536, and everything recorded after
@@ -20,14 +24,14 @@ classes: [asphalt, red_path, wood_chips, grass_dirt, tile]
 
 bags:
   garden_surfaces_1548:
-    - [0, 10, asphalt]
+    - [4.5, 10, asphalt]         # DATA.md: 0-10. 2.5-6.5 s is a mossy concrete patch
     - [12, 55, grass_dirt]
     - [57, 72, asphalt]          # cracked asphalt, still asphalt for this classifier
     - [76, 87, asphalt]
   garden_surfaces_1607:
     - [0, 6, asphalt]            # cracked asphalt
-    - [8, 30, grass_dirt]
-    - [31, 43.8, red_path]       # camera stops at 43.8 s
+    - [8, 34, grass_dirt]        # DATA.md: 8-30. Grass continues to 34.2 s
+    - [34, 41, red_path]         # DATA.md: 31-44. Kerb at 34.7-35.7 s, red path from 36 s, camera stops at 43.8 s
   garden_surfaces_1618:
     - [0, 36, asphalt]           # cracked asphalt, driven slowly
     - [38, 60, grass_dirt]
@@ -36,7 +40,7 @@ bags:
   garden_surfaces_1628:
     - [0, 21, red_path]
     - [27, 45, wood_chips]       # wood chips and leaves
-    - [46, 65, grass_dirt]       # dirt with sparse grass
+    - [46, 62.5, grass_dirt]     # DATA.md: 46-65. Concrete patch from 62.7 s, asphalt from 66.8 s
     - [67, 89, asphalt]
   # Indoor bags: plain tile floor the whole way. The objects placed in some of
   # them (books, foam, wood) cover a small part of the frame; the patch vote

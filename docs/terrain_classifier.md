@@ -22,17 +22,31 @@ The number of epochs (12) is fixed in advance. There is no extra validation run 
 
 ## Frames available (2 fps, after the 2 s margins)
 
-Estimated from the time ranges; `terrain_extract.py` prints the real table.
+Extracted on 2026-11-09 from the bags on the shared drive:
 
-| Surface | Bags | About |
-|---|---|---|
-| asphalt | 1548, 1607, 1618, 1628 | 150 frames |
-| grass/dirt | 1548, 1607, 1618, 1628 | 180 frames |
-| red path | 1607, 1618, 1628 | 70 frames |
-| wood chips | 1618, 1628 | 45 frames |
-| tile | 1338, 1434, 1447, 1652 | 350 frames |
+| Bag | asphalt | red path | wood chips | grass/dirt | tile |
+|---|---|---|---|---|---|
+| garden_surfaces_1548 | 39 | | | 78 | |
+| garden_surfaces_1607 | 4 | 6 | | 44 | |
+| garden_surfaces_1618 | 64 | 18 | 16 | 36 | |
+| garden_surfaces_1628 | 36 | 34 | 28 | 25 | |
+| corridor_book_1338_indoor | | | | | 58 |
+| corridor_book_1434_indoor_books | | | | | 58 |
+| corridor_groundtruth_1447 | | | | | 72 |
+| crossing_slow_1652 | | | | | 172 |
+| **total** | **143** | **58** | **44** | **183** | **360** |
 
-Wood chips is the weak spot: in each fold the model trains on wood chips from a single run.
+788 frames, 271 MB of PNG. Wood chips is the weak spot: in each fold the model trains on wood chips from a single run.
+
+**Label check.** Every segment was checked on its first, middle and last frame, and the suspicious boundaries frame by frame. Three ranges in `docs/DATA.md` are off by a few seconds and would have put wrong frames into training, so `terrain_labels.yaml` uses corrected times:
+
+| Bag | DATA.md | What the frames show | Used |
+|---|---|---|---|
+| 1548 | asphalt 0-10 | 2.5-6.5 s is a mossy concrete patch | asphalt 4.5-10 |
+| 1607 | grass 8-30, red path 31-44 | grass to 34.2 s, kerb 34.7-35.7 s, red path from 36 s | grass 8-34, red path 34-41 |
+| 1628 | grass/dirt 46-65 | concrete patch from 62.7 s, asphalt from 66.8 s | grass/dirt 46-62.5 |
+
+**Bags from the Drive.** Downloading the `bags` folder as one zip gives the large `.mcap` files as loose files named `<bag>_0-00N.mcap` and the rest in several zips. Put each bag back into its own folder (`<bag>/<bag>_0.mcap` plus `metadata.yaml`, the names listed in `metadata.yaml`) before running the extractor.
 
 ## Running it on the GPU server
 
@@ -45,7 +59,7 @@ pip install -e ".[onnx,dev]"
 python -m pytest
 ```
 
-Put these bag folders from the shared drive in one folder, for example `/scratch2/yamin/bags/`: `garden_surfaces_1548`, `garden_surfaces_1607`, `garden_surfaces_1618`, `garden_surfaces_1628`, `corridor_book_1338_indoor`, `corridor_book_1434_indoor_books`, `corridor_groundtruth_1447`, `crossing_slow_1652`. Each is a folder with the `.mcap` and `metadata.yaml`.
+Either copy the extracted frames (`data/terrain/`, 271 MB) to the server and skip the extraction, or put these bag folders from the shared drive in one folder, for example `/scratch2/yamin/bags/`: `garden_surfaces_1548`, `garden_surfaces_1607`, `garden_surfaces_1618`, `garden_surfaces_1628`, `corridor_book_1338_indoor`, `corridor_book_1434_indoor_books`, `corridor_groundtruth_1447`, `crossing_slow_1652`. Each is a folder with the `.mcap` and `metadata.yaml`.
 
 ```bash
 python scripts/terrain_extract.py --bags /scratch2/yamin/bags          # prints frames per surface and bag
