@@ -86,7 +86,40 @@ ros2 launch rgb_terrain rgb_terrain.launch.py use_sim_time:=true   # with ros2 b
 
 Publishes `{"label": "grass_dirt", "confidence": 0.87}` on `/ground/rgb_terrain` at 2 Hz, or `"unknown"` when the confidence is below `min_confidence` (default 0.5). One frame takes about 28 ms on a single laptop CPU thread. Needs `onnxruntime`, which the Dockerfile already installs for the crack node.
 
-The model files are `src/rgb_terrain/models/rgb_terrain_v1.json` (in git) and `rgb_terrain_v1.onnx` (6.1 MB, not in git; GitHub release `terrain-model-v1`, sha256 `12203c836fcc3b565680fa0f908def67d7cead2cb54ae22b679090261cca877c`). The node has not been run under ROS yet.
+The model files are `src/rgb_terrain/models/rgb_terrain_v1.json` (in git) and `rgb_terrain_v1.onnx` (6.1 MB, not in git; GitHub release `terrain-model-v1`, sha256 `12203c836fcc3b565680fa0f908def67d7cead2cb54ae22b679090261cca877c`). The node has been run under ROS on a bag (Praveen).
+
+## Class mask for the costmap
+
+The semantic segmentation costmap layer for Nav2 ([kiwicampus/semantic_segmentation_layer](https://github.com/kiwicampus/semantic_segmentation_layer), jazzy branch) needs a class per pixel, not one label per frame. The model already scores six patches per frame, so `predict_mask()` keeps each patch's answer instead of averaging them:
+
+```python
+from terrain_onnx import TerrainClassifier, UNKNOWN
+clf = TerrainClassifier("rgb_terrain_v1.onnx")
+mask, conf, patch_probs = clf.predict_mask(frame, bgr=False)    # full 640x480 frame, as for predict()
+```
+
+- `mask`: uint8, 480x640. Each patch box is filled with the patch's class id, in the order of `classes` in `rgb_terrain_v1.json`: asphalt 0, red_path 1, wood_chips 2, grass_dirt 3, tile 4. Everything else is 255 (`UNKNOWN`): the robot strip (rows 400-479) and the side columns 0-19 and 620-639. A patch whose best probability is below `min_confidence` (0.5, as in the node) is also 255.
+- `conf`: uint8, 480x640. Each patch box holds round(best probability x 255), even for an unsure patch; 0 outside the boxes.
+- `patch_probs`: float, 6x5, the softmax per patch before averaging. `predict()` is the mean of the same array, so the two always agree.
+
+The same file is in `src/rgb_terrain/rgb_terrain/terrain_onnx.py` for the node. Tests: `python -m pytest tests/test_terrain.py` (mask shape and type, the unknown border, one class per patch box, unsure patches, agreement with `predict()`).
+
+Examples from `garden_surfaces_1628` (`scripts/terrain_mask_examples.py`). The v1 model was trained on all labelled runs, 1628 included, so these show the output format, not accuracy (that is in the results below).
+
+<p align="center">
+  <img src="media/terrain_mask_1628_red_path.png" width="49%" alt="Mask on the red path, all six patches red path">
+  <img src="media/terrain_mask_1628_wood_chips.png" width="49%" alt="Mask on wood chips, all six patches wood chips">
+  <img src="media/terrain_mask_1628_grass_dirt.png" width="49%" alt="Mask on grass and dirt, all six patches grass/dirt">
+  <img src="media/terrain_mask_1628_asphalt.png" width="49%" alt="Mask on asphalt, all six patches asphalt">
+</p>
+
+On one surface all six patches agree at 0.89-0.95. At the change from wood chips to dirt (45.2 s) they do not: four patches say grass/dirt (0.57-0.93), the top middle patch is unsure (0.45, so unknown in the mask), and the top right patch, which sees green plants, says wood chips at 0.54. The frame label is grass/dirt at 0.68, so the mask holds information the single label throws away.
+
+<p align="center">
+  <img src="media/terrain_mask_1628_change.png" width="60%" alt="Mask at the change from wood chips to dirt: patches disagree, one is unknown">
+</p>
+
+Each patch covers 200x200 pixels, so the mask is coarse: about a third of the image width per cell. That matches what the costmap needs (which ground lies ahead), but a boundary between two surfaces is only placed to within one patch.
 
 ## Results (v1, 2026-11-09)
 

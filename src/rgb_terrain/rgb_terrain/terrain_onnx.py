@@ -5,6 +5,7 @@ Meant to be copied into the ROS node package, like crack_onnx.py.
     from terrain_onnx import TerrainClassifier
     clf = TerrainClassifier("rgb_terrain_v1.onnx")        # reads rgb_terrain_v1.json next to it
     label, confidence, probs = clf.predict(frame_bgr, bgr=True)
+    mask, conf, patch_probs = clf.predict_mask(frame_bgr, bgr=True)
 
 The frame must be the full 640x480 colour image: the patch positions in the
 JSON are pixel boxes in that frame, chosen above the robot mask.
@@ -17,6 +18,8 @@ from pathlib import Path
 
 import numpy as np
 import onnxruntime as ort
+
+UNKNOWN = 255   # mask value for pixels outside the patches and for unsure patches
 
 
 class TerrainClassifier:
@@ -44,7 +47,8 @@ class TerrainClassifier:
         x = (patch.astype(np.float32) / 255.0 - self.mean) / self.std
         return x.transpose(2, 0, 1)
 
-    def predict(self, image: np.ndarray, bgr: bool = False) -> tuple[str, float, np.ndarray]:
+    def patch_probs(self, image: np.ndarray, bgr: bool = False) -> np.ndarray:
+        """Softmax per patch, shape (number of patches, number of classes)."""
         h, w = image.shape[:2]
         if (w, h) != self.frame_wh:
             raise ValueError(f"expected a {self.frame_wh[0]}x{self.frame_wh[1]} frame, got {w}x{h}")
@@ -52,6 +56,30 @@ class TerrainClassifier:
         batch = np.stack([self._prepare(rgb[y:y + bh, x:x + bw]) for x, y, bw, bh in self.boxes])
         logits = self.session.run(None, {"patches": batch})[0]
         e = np.exp(logits - logits.max(axis=1, keepdims=True))
-        probs = (e / e.sum(axis=1, keepdims=True)).mean(axis=0)
+        return e / e.sum(axis=1, keepdims=True)
+
+    def predict(self, image: np.ndarray, bgr: bool = False) -> tuple[str, float, np.ndarray]:
+        """One label for the frame: the patch probabilities averaged."""
+        probs = self.patch_probs(image, bgr).mean(axis=0)
         best = int(probs.argmax())
         return self.classes[best], float(probs[best]), probs
+
+    def predict_mask(self, image: np.ndarray, bgr: bool = False, min_confidence: float = 0.5
+                     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Class id per pixel, for a semantic costmap layer.
+
+        Each patch box gets its own answer instead of the frame average.
+        mask: uint8 class id (index into self.classes), UNKNOWN outside the
+        boxes and where the patch's best probability is below min_confidence.
+        conf: uint8, the patch's best probability * 255, 0 outside the boxes.
+        """
+        probs = self.patch_probs(image, bgr)
+        w, h = self.frame_wh
+        mask = np.full((h, w), UNKNOWN, np.uint8)
+        conf = np.zeros((h, w), np.uint8)
+        for (x, y, bw, bh), p in zip(self.boxes, probs):
+            best = int(p.argmax())
+            conf[y:y + bh, x:x + bw] = int(round(float(p[best]) * 255))
+            if p[best] >= min_confidence:
+                mask[y:y + bh, x:x + bw] = best
+        return mask, conf, probs

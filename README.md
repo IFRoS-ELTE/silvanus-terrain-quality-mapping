@@ -26,7 +26,7 @@ The short version: **the camera predicts, the IMU confirms.**
 | 2 | Crack model trained and released for the robot | Done, model v1 running in the crack node on our recordings |
 | 2 | Indoor map with SLAM, Nav2 to a goal on it | Done 27 Oct: the corridor loop closes to 1 cm, the robot drives to goals from RViz |
 | 2 | IMU roughness | Done 9 Nov: node publishes the fast/slow band ratio on `/terrain/imu_roughness`; checked on bag replay (section 3) |
-| 2 | RGB terrain classifier | Done 9 Nov: 99.5 % of frames right on runs it never saw, five surfaces (section 3); ROS node tested on a bag |
+| 2 | RGB terrain classifier | Done 9 Nov: 99.5 % of frames right on runs it never saw, five surfaces (section 3); ROS node tested on a bag; class mask per patch for the Nav2 costmap (11 Nov) |
 | 2 | Annotation of our own crack frames | In progress |
 | 3 (15-21 Oct) | Zigzag coverage sweep | First sweep on the robot 27 Oct, Nav2 through the governor; its stall at a lane change is fixed and checked in simulation |
 | 3 | Speed governor: slow down so the IMU can feel a hazard, stop before obstacles | Live on the robot 27 Oct: slows to 0.2 m/s, feels 10-74 mm plates, stops for walls and tall objects |
@@ -138,6 +138,12 @@ Which surface it confused with which, on the held-out runs 1628 (outdoor) and 14
 </p>
 
 The surfaces are visually distinct and all outdoor runs were recorded on one afternoon, so this shows the classifier works on our recordings, not yet on other days or surfaces. On a run with ground it has no class for, it calls smooth concrete "asphalt" with high confidence. A metal drain grate gets low confidence, so the node publishes `unknown` there. Details, both folds and the confusion matrix: [docs/terrain_classifier.md](docs/terrain_classifier.md).
+
+For the Nav2 costmap the classifier also gives a class per patch instead of one per frame (`predict_mask()`), so the robot sees where one surface ends and the next starts. At the change from wood chips to dirt, four patches say grass/dirt, one is unsure and is left unknown:
+
+<p align="center">
+  <img src="docs/media/terrain_mask_1628_change.png" width="55%" alt="Per-patch terrain mask at a surface change: patches disagree, one is unknown">
+</p>
 
 ### Roughness per surface, camera against IMU
 
