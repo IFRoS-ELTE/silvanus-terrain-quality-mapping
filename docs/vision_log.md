@@ -223,6 +223,13 @@ Requested by the team lead: a class per pixel for the semantic segmentation cost
 - `scripts/terrain_mask_examples.py`: overlays on 1628 at 10, 35, 55, 75 s and the most mixed frame near 45 s (`docs/media/terrain_mask_1628_*.png`). Section "Class mask for the costmap" in `docs/terrain_classifier.md`.
 - The team lead ran `terrain_imu` and `rgb_terrain` under ROS on bag 1628. Red path came out 0.74 in that run against 0.35 here: to check.
 
+### 2026-11-11 (later): red path check, crossings height against jolt
+
+- Red path on 1628: the team lead's ROS run gave 0.74, the replay 0.35. Same values: median 0.35, mean 0.75. On 1628 the red path is in the speed range for only 7 s, and the last 3.5 s are covered in loose wood chips (ratio 1-3). Note in `docs/surface_roughness.md`.
+- `tools/analysis/crossing_jolts.py` (rosbags, no ROS): per pass over each tape-measured object in 1652 and 1703, the camera height (the method of `score_groundtruth.py`), which wheels ran over it (robot-frame position when each axle passes) and the jolt (`hazard_map.py`). The first version required both wheels of an axle on the object and found only the long ones; fixed.
+- Result: heights within 4 mm of the tape; jolt not related to height (rho 0.00, 17 passes), related to speed (rho 0.87, rigid objects). Foam strips felt on some passes at 0.26-0.42 m/s. Straddled objects not felt. The 1703 return pass has no camera and drifts 0.4 m sideways, so it is left out of the figure.
+- Advice for the new runs: rigid objects of several heights in a wheel track, a few passes per speed.
+
 ## 4. Next steps
 
 Crack model (Aritra, steps in `docs/crack_model.md`):

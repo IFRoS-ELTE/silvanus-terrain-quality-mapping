@@ -1,0 +1,27 @@
+bag,object,tape_mm,camera_mm,length_mm,frames,seen_t,height_from,front_t,front_wheels,front_jolt,front_shaking_p95,front_felt,rear_t,rear_wheels,rear_jolt,rear_shaking_p95,rear_felt,lateral_m,speed,on_wheel,jolt,felt
+crossing_slow_1652,foam block,50,46.934,287.771,11,6.8,this pass,10.457,right,1.322,0.502,True,12.31,right,0.879,0.623,True,-0.304,0.288,True,1.322,True
+crossing_slow_1652,foam strip,20,20.64,970.596,12,11.9,this pass,16.369,left+right,0.435,0.538,False,18.264,left+right,0.656,0.624,False,-0.03,0.265,True,0.656,False
+crossing_slow_1652,wood block,15,18.998,337.321,21,17.2,this pass,20.982,left,1.36,0.645,True,22.643,left,0.775,0.653,False,0.36,0.293,True,1.36,True
+crossing_slow_1652,foam strip,20,19.077,956.136,14,21.3,this pass,24.959,left+right,0.459,0.73,False,26.886,left+right,1.233,0.663,True,0.112,0.263,True,1.233,True
+crossing_slow_1652,wood block,15,18.793,337.606,22,25.8,this pass,29.814,none,0.804,0.642,False,32.02,none,0.465,0.663,False,-0.032,0.224,False,0.804,False
+crossing_slow_1652,book,30,26.804,229.369,23,30.1,this pass,34.97,left,1.118,0.435,True,37.078,left,0.881,0.444,True,0.309,0.244,True,1.118,True
+crossing_slow_1652,long plank,20,18.981,1214.433,20,38.5,this pass,43.02,left+right,0.482,0.449,False,45.504,left+right,0.595,0.419,False,-0.099,0.207,True,0.595,False
+crossing_slow_1652,long plank,20,19.735,1166.302,18,65.5,this pass,69.502,left+right,0.929,0.664,True,71.075,left+right,0.886,0.683,False,0.154,0.303,True,0.929,True
+crossing_slow_1652,book,30,25.653,224.009,14,72.0,this pass,75.017,right,2.776,0.872,True,76.466,right,1.1,1.008,False,-0.146,0.342,True,2.776,True
+crossing_slow_1652,wood block,15,15.702,242.534,22,75.5,this pass,78.36,left,1.13,0.851,True,79.817,left,0.848,0.935,False,0.292,0.341,True,1.13,True
+crossing_slow_1652,foam strip,20,19.373,953.009,8,78.6,this pass,81.648,left+right,0.854,1.017,False,82.872,left+right,1.158,0.997,False,0.017,0.42,True,1.158,False
+crossing_slow_1652,foam strip,20,19.943,968.755,9,84.8,this pass,87.424,left+right,0.844,1.015,False,88.648,left+right,1.414,0.911,True,-0.026,0.409,True,1.414,True
+crossing_slow_1652,foam block,50,47.798,279.93,5,88.5,this pass,,,,,False,,,,,False,,,False,,False
+crossing_fast_1703,foam block,50,46.456,283.691,4,5.5,this pass,7.639,right,1.16,1.309,False,8.692,right,1.381,1.496,False,-0.236,0.481,True,1.381,False
+crossing_fast_1703,foam strip,20,20.456,968.555,6,9.0,this pass,10.88,left+right,1.042,1.636,False,11.629,left+right,1.051,1.492,False,0.029,0.651,True,1.051,False
+crossing_fast_1703,wood block,15,15.485,295.316,7,11.0,this pass,12.543,left,2.185,1.398,True,13.309,left,2.639,1.289,True,0.398,0.645,True,2.639,True
+crossing_fast_1703,foam strip,20,18.801,954.168,6,13.1,this pass,14.569,left+right,0.951,1.637,False,15.411,left+right,1.066,1.774,False,0.169,0.593,True,1.066,False
+crossing_fast_1703,wood block,15,18.407,339.362,6,14.9,this pass,16.726,none,1.209,1.994,False,17.627,none,0.85,2.122,False,-0.034,0.553,False,1.209,False
+crossing_fast_1703,book,30,26.297,224.543,6,17.0,this pass,18.91,left,1.793,1.489,False,19.807,left,1.53,1.479,False,0.309,0.544,True,1.793,False
+crossing_fast_1703,long plank,20,17.622,1023.162,7,30.5,this pass,32.02,left+right,2.348,1.575,True,32.666,left+right,2.843,1.449,True,0.202,0.762,True,2.843,True
+crossing_fast_1703,foam block,50,46.456,283.691,0,5.5,outward pass,42.807,right,2.33,2.093,False,43.317,right,5.866,2.028,True,-0.21,0.983,True,5.866,True
+crossing_fast_1703,foam strip,20,20.456,968.555,0,9.0,outward pass,40.509,right,2.901,2.489,False,41.09,right,2.519,2.212,False,-0.427,0.866,True,2.901,False
+crossing_fast_1703,wood block,15,15.485,295.316,0,11.0,outward pass,38.255,none,2.876,2.005,True,38.779,none,7.233,2.215,True,-0.504,0.806,False,7.233,False
+crossing_fast_1703,foam strip,20,18.801,954.168,0,13.1,outward pass,36.288,left+right,1.665,2.332,False,37.113,left+right,2.616,2.518,False,0.094,0.604,True,2.616,False
+crossing_fast_1703,wood block,15,18.407,339.362,0,14.9,outward pass,34.731,left,1.265,2.119,False,35.365,left,2.528,2.111,False,0.293,0.788,True,2.528,False
+crossing_fast_1703,book,30,26.297,224.543,0,17.0,outward pass,33.253,right,3.567,1.519,True,33.895,right,1.458,1.937,False,-0.172,0.77,True,3.567,True
