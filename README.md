@@ -84,6 +84,12 @@ What else the crossing runs showed:
 - It never feels the 20 mm foam, because foam squashes under the tyre. This is a result: some hazards the camera sees are harmless for this robot.
 - Above about 0.4 m/s the robot's own shaking on tile hides every object. The IMU can only confirm a hazard if the robot slows down near it, which is what the speed governor is for.
 
+**Height against jolt, per crossing.** On the two crossing runs the camera measures every object within 4 mm of the tape. For each pass we checked which wheel ran over the object and how hard the IMU jolted. The jolt does not grow with height here (rho = 0.00 over 17 passes, heights 15-47 mm); it grows with speed (rho = 0.87 for the rigid objects). Foam strips were felt on some passes at 0.26-0.42 m/s, and objects passing between the wheels are not felt. The next recordings at 0.2, 0.3 and 0.4 m/s need rigid objects of several heights in a wheel track, to give a height-jolt curve per speed. Details: [docs/surface_roughness.md](docs/surface_roughness.md#crossings-bump-height-against-the-imu-jolt).
+
+<p align="center">
+  <img src="docs/media/crossing_jolts.png" width="65%" alt="Camera bump height against IMU jolt per crossing, two runs">
+</p>
+
 ## 3. Outdoor surfaces
 
 <p align="center">
@@ -273,7 +279,7 @@ Every hazard will end up in one of three classes, which is the main result of th
 | [docs/schema.md](docs/schema.md) | Topic names and message formats |
 | [docs/crack_model.md](docs/crack_model.md) | Crack model: files, how to use it in the node, annotation and fine-tuning |
 | [docs/terrain_classifier.md](docs/terrain_classifier.md) | RGB terrain classifier: labels, training by held-out run, results, the ROS node |
-| [docs/surface_roughness.md](docs/surface_roughness.md) | IMU roughness node, roughness per surface, camera unevenness against IMU roughness |
+| [docs/surface_roughness.md](docs/surface_roughness.md) | IMU roughness node, roughness per surface, camera unevenness against IMU roughness, bump height against IMU jolt per crossing |
 | [docs/vision_log.md](docs/vision_log.md) | Vision decisions and results, step by step |
 | [docs/robot/](docs/robot/) | Arm pose, IMU mount, how to run a robot session |
 | [tools/analysis/](tools/analysis/README.md) | Scripts that make every figure on this page |
