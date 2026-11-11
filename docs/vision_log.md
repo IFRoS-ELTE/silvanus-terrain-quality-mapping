@@ -214,6 +214,15 @@ Requested by the team lead: the IMU roughness node on bag replay, and the box pl
 - Medians per surface reproduce PROGRESS.md: camera within 0.3 mm; IMU equal for wood chips and grass/dirt, asphalt 2.55 vs 2.2 and red path 0.31 vs 0.51 (per-distance vs per-time sampling, corrected labels, few red-path pieces).
 - Camera unevenness against IMU roughness: Spearman rho = -0.54 over 239 pieces, and no positive relation inside any surface. The camera measures shape, the band ratio measures hardness. Reported as complementary signals, not as "the camera predicts the IMU". For the team lead: the bump-check figure should use crossing jolts instead.
 
+### 2026-11-11: terrain class mask for the Nav2 costmap
+
+Requested by the team lead: a class per pixel for the semantic segmentation costmap layer (kiwicampus/semantic_segmentation_layer), so Nav2 can treat grass and wood chips as costly. The team lead does the ROS side (mask, confidence and LabelInfo topics, point cloud, costmap on bag 1628).
+
+- `deploy/terrain_onnx.py`: new `patch_probs()` (softmax per patch) used by both `predict()` and the new `predict_mask()`, which fills each patch box with its class id (255 outside the boxes and below 0.5 confidence) and a uint8 confidence image. Copied into `src/rgb_terrain/rgb_terrain/`.
+- `tests/test_terrain.py`: four mask tests; the small ONNX model is now a shared fixture. 10 tests pass.
+- `scripts/terrain_mask_examples.py`: overlays on 1628 at 10, 35, 55, 75 s and the most mixed frame near 45 s (`docs/media/terrain_mask_1628_*.png`). Section "Class mask for the costmap" in `docs/terrain_classifier.md`.
+- The team lead ran `terrain_imu` and `rgb_terrain` under ROS on bag 1628. Red path came out 0.74 in that run against 0.35 here: to check.
+
 ## 4. Next steps
 
 Crack model (Aritra, steps in `docs/crack_model.md`):
@@ -224,7 +233,7 @@ Crack model (Aritra, steps in `docs/crack_model.md`):
 
 Terrain (Yamin):
 5. ~~Train and evaluate the terrain classifier~~ Done, see above. Publish `rgb_terrain_v1.onnx` as the GitHub release `terrain-model-v1`.
-6. Run the `rgb_terrain` node on a bag under ROS (not run yet), and give it to the fusion side.
+6. ~~Run the `rgb_terrain` node on a bag under ROS~~ Done by the team lead. Class mask for the costmap: done 11 Nov.
 7. Run Aritra's fine-tune when his annotations are ready.
 8. Optional: a `concrete` class from the concrete in `garden_surfaces_1536`; terrain on another day or in other light.
 

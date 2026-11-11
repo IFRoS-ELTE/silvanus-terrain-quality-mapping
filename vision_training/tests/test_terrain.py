@@ -118,11 +118,10 @@ def test_training_and_frame_vote_end_to_end(tmp_path):
     assert "| tile |" in (tmp_path / "out" / "results.md").read_text()
 
 
-def test_onnx_wrapper_matches_torch(tmp_path):
+@pytest.fixture
+def onnx_model(tmp_path):
+    """A small untrained classifier exported like terrain_export_onnx.py does."""
     pytest.importorskip("onnxruntime")
-    sys.path.insert(0, str(ROOT / "deploy"))
-    from terrain_onnx import TerrainClassifier
-
     torch.manual_seed(0)
     model = build_model("mobilenet_v3_small", len(CLASSES), pretrained=False).eval()
     torch.onnx.export(model, torch.randn(1, 3, 224, 224), tmp_path / "t.onnx",
@@ -132,15 +131,67 @@ def test_onnx_wrapper_matches_torch(tmp_path):
     (tmp_path / "t.json").write_text(json.dumps({
         "classes": CLASSES, "patch_boxes_xywh": [list(b) for b in boxes], "frame_size_wh": [640, 480],
         "input_size": 224, "mean": [0.485, 0.456, 0.406], "std": [0.229, 0.224, 0.225]}))
+    return model, tmp_path / "t.onnx", boxes
 
-    rgb = np.random.default_rng(1).integers(0, 255, (480, 640, 3), dtype=np.uint8)
-    rgb = np.array(Image.fromarray(rgb).resize((160, 120)).resize((640, 480)))  # smooth, like a real photo
 
+def smooth_frame(seed=1):
+    rgb = np.random.default_rng(seed).integers(0, 255, (480, 640, 3), dtype=np.uint8)
+    return np.array(Image.fromarray(rgb).resize((160, 120)).resize((640, 480)))  # smooth, like a real photo
+
+
+def load_classifier(onnx_path):
+    sys.path.insert(0, str(ROOT / "deploy"))
+    from terrain_onnx import TerrainClassifier
+    return TerrainClassifier(onnx_path)
+
+
+def test_onnx_wrapper_matches_torch(onnx_model, tmp_path):
+    model, onnx_path, boxes = onnx_model
+    rgb = smooth_frame()
     ds = PatchDataset(tmp_path, [Frame("x.png", "b", 0, "tile")], CLASSES, boxes, eval_transform(224))
     Image.fromarray(rgb).save(tmp_path / "x.png")
     with torch.no_grad():
         expected = torch.softmax(model(torch.stack([ds[i][0] for i in range(len(ds))])), 1).mean(0).numpy()
 
-    label, conf, probs = TerrainClassifier(tmp_path / "t.onnx").predict(rgb[..., ::-1].copy(), bgr=True)
+    label, conf, probs = load_classifier(onnx_path).predict(rgb[..., ::-1].copy(), bgr=True)
     assert np.abs(probs - expected).max() < 0.02    # cv2 and torchvision resize differ very slightly
     assert label == CLASSES[int(expected.argmax())]
+
+
+def test_mask_shape_and_unknown_border(onnx_model):
+    clf = load_classifier(onnx_model[1])
+    mask, conf, patch_probs = clf.predict_mask(smooth_frame())
+    assert mask.shape == conf.shape == (480, 640)
+    assert mask.dtype == conf.dtype == np.uint8
+    assert patch_probs.shape == (6, len(CLASSES))
+    assert np.allclose(patch_probs.sum(axis=1), 1, atol=1e-5)
+    for outside in (np.s_[400:, :], np.s_[:, :20], np.s_[:, 620:]):   # robot strip and side columns
+        assert (mask[outside] == 255).all()
+        assert (conf[outside] == 0).all()
+    assert set(np.unique(mask)) <= set(range(len(CLASSES))) | {255}
+
+
+def test_mask_follows_each_patch(onnx_model):
+    clf = load_classifier(onnx_model[1])
+    mask, conf, patch_probs = clf.predict_mask(smooth_frame(), min_confidence=0.0)
+    for (x, y, w, h), p in zip(clf.boxes, patch_probs):
+        assert (mask[y:y + h, x:x + w] == p.argmax()).all()
+        assert (conf[y:y + h, x:x + w] == round(p.max() * 255)).all()
+
+
+def test_unsure_patches_are_unknown(onnx_model):
+    clf = load_classifier(onnx_model[1])
+    mask, conf, patch_probs = clf.predict_mask(smooth_frame(), min_confidence=1.01)
+    assert (mask == 255).all()                  # no patch is that sure
+    assert conf.max() > 0                       # but the confidence is still there
+
+
+def test_mask_agrees_with_predict_when_patches_agree(onnx_model):
+    clf = load_classifier(onnx_model[1])
+    frame = np.zeros((480, 640, 3), np.uint8)
+    frame[:] = COLOURS["asphalt"]               # every patch sees the same ground
+    mask, _, patch_probs = clf.predict_mask(frame, min_confidence=0.0)
+    label, _, probs = clf.predict(frame)
+    assert len(set(patch_probs.argmax(axis=1))) == 1
+    assert np.allclose(patch_probs.mean(axis=0), probs)
+    assert CLASSES[mask[100, 100]] == label
